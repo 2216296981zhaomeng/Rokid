@@ -1,0 +1,11 @@
+framework module RokidCXRLUniPlugin {
+  umbrella header "RokidCXRLUniPlugin.h"
+  export *
+
+  module * { export * }
+}
+
+module RokidCXRLUniPlugin.Swift {
+  header "RokidCXRLUniPlugin-Swift.h"
+  requires objc
+}

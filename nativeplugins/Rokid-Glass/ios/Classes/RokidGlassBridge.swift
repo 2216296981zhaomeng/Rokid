@@ -1,0 +1,1407 @@
+import Foundation
+import UIKit
+import Combine
+import AVFoundation
+import RGCxrClient
+
+public typealias RokidGlassCallback = (_ result: Any?, _ keepAlive: Bool) -> Void
+
+@objcMembers
+public final class RokidGlassBridge: NSObject {
+    public static let shared = RokidGlassBridge()
+
+    private static var initialized = false
+    private static var initializedSessionType = "customView"
+
+    private let client: RGCxrClient = CxrClient.shared
+    private let bridgeVersion = "ios-cxrl-1.0.5-native-upload-20260608"
+    private var cancellables = Set<AnyCancellable>()
+    private var eventCallback: RokidGlassCallback?
+    private var pendingPhotoCallback: RokidGlassCallback?
+
+    private var token = ""
+    private var sessionId = ""
+    private var deviceName = ""
+    private var sessionType = "customView"
+    private var packageName = "com.rokid.cxrswithcxrl"
+    private var sceneReady = false
+    private var audioStarted = false
+    private var audioCodecType = -1
+    private var photoTaking = false
+    private var audioType = "agent"
+
+    private let audioQueue = DispatchQueue(label: "com.zhaiwo.agent.rokid.ios.audio")
+    private var pcmFileHandle: FileHandle?
+    private var pcmPath = ""
+    private var wavPath = ""
+    private var audioBytes = 0
+    private var audioChunkCount = 0
+    private var audioSessionId: Int64 = 0
+    private var audioRealtimeBuffer = Data()
+    private var audioRealtimeSeq = 0
+    private var lastAudioEmitAt = Date.distantPast
+    private var nativeAudioUploader: RokidNativeAudioUploader?
+    private var nativeAudioUploadEnabled = false
+    private var nativeAudioUploadState = "idle"
+    private var nativeAudioUploadError = ""
+    private var nativeAudioEnqueuedBytes = 0
+    private var nativeAudioDroppedBytes = 0
+    private var nativeAudioSentBytes = 0
+    private var nativeAudioSentChunks = 0
+
+    private let sampleRate = 16000
+    private let channels = 1
+    private let bitsPerSample = 16
+    private let realtimeMinBytes = 6400
+    private let realtimeMaxInterval: TimeInterval = 0.25
+
+    public override init() {
+        super.init()
+        bindEvents()
+    }
+
+    @objc(sharedInstance)
+    public static func sharedInstance() -> RokidGlassBridge {
+        return shared
+    }
+
+    public func setEventCallback(_ callback: RokidGlassCallback?) {
+        eventCallback = callback
+        invokeKeepAlive(callback, ok(stateJson().merging([
+            "event": "nativeBridgeReady",
+            "bridge": "RokidGlassBridge",
+            "bridgeVersion": bridgeVersion
+        ]) { _, new in new }))
+    }
+
+    public func initSDK(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        let nextType = stringOption(options, "sessionType", sessionType)
+        sessionType = nextType == "customApp" ? "customApp" : "customView"
+        packageName = stringOption(options, "packageName", packageName)
+        initializeIfNeeded(sessionType)
+        invoke(callback, ok(stateJson().merging([
+            "rokidAIAppInstalled": client.isRokidAppInstalled(),
+            "iosInitializedSessionType": Self.initializedSessionType
+        ]) { _, new in new }))
+    }
+
+    public func checkPermissions(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        invoke(callback, ok(stateJson().merging([
+            "rokidAIAppInstalled": client.isRokidAppInstalled()
+        ]) { _, new in new }))
+    }
+
+    public func requestAuthorization(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        initializeIfNeeded(sessionType)
+        guard client.isRokidAppInstalled() else {
+            invoke(callback, error(1002, "Rokid AI App is not installed"))
+            return
+        }
+
+        let appName = stringOption(options, "appName", "宅喔经纪人")
+        client.auth.authenticate(
+            scopes: ["device_control", "audio_stream"],
+            appName: appName
+        ) { [weak self] result in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let auth):
+                    self.token = auth.0
+                    self.sessionId = auth.1 ?? ""
+                    self.deviceName = self.currentDeviceName()
+                    self.emit("authorization", self.stateJson())
+                    self.invoke(callback, self.ok(self.stateJson().merging([
+                        "token": self.token,
+                        "sessionId": self.sessionId,
+                        "deviceName": self.deviceName
+                    ]) { _, new in new }))
+                case .failure(let authError):
+                    self.emit("authorization", self.stateJson().merging([
+                        "message": authError.localizedDescription
+                    ]) { _, new in new })
+                    self.invoke(callback, self.error(1002, authError.localizedDescription))
+                }
+            }
+        }
+    }
+
+    public func connectCustomView(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        sessionType = "customView"
+        initializeIfNeeded(sessionType)
+        invoke(callback, ok(stateJson()))
+    }
+
+    public func connectCustomApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        sessionType = "customApp"
+        packageName = stringOption(options, "packageName", packageName)
+        initializeIfNeeded(sessionType)
+        invoke(callback, ok(stateJson()))
+    }
+
+    public func openCustomView(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        guard ensureAuthenticated(callback) else { return }
+        sessionType = "customView"
+        initializeIfNeeded(sessionType)
+        let viewJson = stringOption(options, "viewJson", defaultCustomViewJson(
+            title: stringOption(options, "title", "宅喔带看"),
+            text: stringOption(options, "text", "眼镜端场景已打开")
+        ))
+        client.openCustomView(viewJson) { [weak self] success, errorCode in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.sceneReady = success
+                let payload = self.stateJson().merging([
+                    "errorCode": errorCode as Any
+                ]) { _, new in new }
+                self.emit(success ? "customViewOpened" : "customViewError", payload)
+                self.invoke(callback, success ? self.ok(payload) : self.error(1003, "openCustomView failed: \(String(describing: errorCode))"))
+            }
+        }
+    }
+
+    public func updateCustomView(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        guard ensureAuthenticated(callback) else { return }
+        let updateJson = stringOption(options, "updateJson", defaultUpdateJson(text: stringOption(options, "text", "Updated")))
+        client.updateCustomView(updateJson) { [weak self] success in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.emit(success ? "customViewUpdated" : "customViewError", self.stateJson())
+                self.invoke(callback, success ? self.ok(self.stateJson()) : self.error(1003, "updateCustomView failed"))
+            }
+        }
+    }
+
+    public func closeCustomView(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        let viewJson = stringOption(options, "viewJson", defaultCustomViewJson(title: "宅喔带看", text: ""))
+        client.closeCustomView(viewJson) { [weak self] success in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                if success { self.sceneReady = false }
+                self.emit("customViewClosed", self.stateJson())
+                self.invoke(callback, success ? self.ok(self.stateJson()) : self.error(1003, "closeCustomView failed"))
+            }
+        }
+    }
+
+    public func openApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        guard ensureAuthenticated(callback) else { return }
+        sessionType = "customApp"
+        initializeIfNeeded(sessionType)
+        let entry = stringOption(options, "entry", packageName + ".activities.main.MainActivity")
+        let url = stringOption(options, "url", "")
+        client.openApp(activityName: entry, url: url) { [weak self] success in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.sceneReady = success
+                self.emit("appOpenResult", self.stateJson().merging(["success": success]) { _, new in new })
+                self.invoke(callback, success ? self.ok(self.stateJson()) : self.error(1003, "openApp failed"))
+            }
+        }
+    }
+
+    public func stopApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        client.stopApp { [weak self] success in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                if success { self.sceneReady = false }
+                self.emit("appStopResult", self.stateJson().merging(["success": success]) { _, new in new })
+                self.invoke(callback, self.ok(self.stateJson()))
+            }
+        }
+    }
+
+    public func queryApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        client.queryApp { [weak self] installed in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.emit("appQueryResult", self.stateJson().merging(["installed": installed]) { _, new in new })
+                self.invoke(callback, self.ok(self.stateJson().merging(["installed": installed]) { _, new in new }))
+            }
+        }
+    }
+
+    public func installApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        let path = stringOption(options, "apkPath", stringOption(options, "path", ""))
+        guard !path.isEmpty else {
+            invoke(callback, error(1004, "apkPath is required"))
+            return
+        }
+        client.installApp(path) { [weak self] success in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.invoke(callback, success ? self.ok(self.stateJson()) : self.error(1003, "installApp failed"))
+            }
+        }
+    }
+
+    public func uninstallApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        client.uninstallApp { [weak self] success in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.invoke(callback, success ? self.ok(self.stateJson()) : self.error(1003, "uninstallApp failed"))
+            }
+        }
+    }
+
+    public func startAudioRecord(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        guard ensureAuthenticated(callback) else { return }
+        initializeIfNeeded(sessionType)
+        audioType = stringOption(options, "iosRecordType", stringOption(options, "recordType", stringOption(options, "type", "test")))
+        audioCodecType = intOption(options, "codecType", 1)
+        let useNativeUpload = boolOption(options, "nativeUpload", false)
+        let nativeWsUrl = stringOption(options, "wsUrl", "")
+        if useNativeUpload && nativeWsUrl.isEmpty {
+            invoke(callback, error(1004, "wsUrl is required when nativeUpload is true"))
+            return
+        }
+        if audioStarted || nativeAudioUploadEnabled {
+            client.stopRecord(audioType)
+            _ = finalizeAudioStop(reason: "restart", sendStop: false, uploadWait: 2.0)
+        }
+        guard resetAudioBuffers() else {
+            audioCodecType = -1
+            nativeAudioUploadEnabled = false
+            invoke(callback, error(1005, "Failed to create audio file"))
+            return
+        }
+        nativeAudioUploadEnabled = useNativeUpload
+        if useNativeUpload {
+            startNativeAudioUpload(options, session: audioSessionId)
+        } else {
+            stopNativeAudioUpload(sendStop: false, wait: 1.0)
+        }
+        audioStarted = true
+        emit("startAudioRecordInvoked", stateJson().merging([
+            "recordType": audioType,
+            "codec": "pcm",
+            "codecType": audioCodecType,
+            "audioCodecType": audioCodecType,
+            "mode": "antClose",
+            "nativeUpload": useNativeUpload,
+            "bleConnected": RGCxrClientBLE.shared.isConnected,
+            "connectedDeviceName": RGCxrClientBLE.shared.connectedDeviceName ?? ""
+        ]) { _, new in new })
+        client.startRecord(audioType, codec: .pcm, mode: .antClose)
+        emit("audioStateChanged", stateJson())
+        invoke(callback, ok(stateJson().merging([
+            "pcmPath": pcmPath,
+            "sampleRate": sampleRate,
+            "channels": channels,
+            "bitsPerSample": bitsPerSample,
+            "nativeUpload": useNativeUpload
+        ]) { _, new in new }))
+    }
+
+    public func stopAudioRecord(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        if audioStarted {
+            client.stopRecord(audioType)
+        }
+        let data = finalizeAudioStop(reason: "apiStop", sendStop: true, uploadWait: 5.0)
+        invoke(callback, ok(data))
+    }
+
+    public func takePhoto(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        guard ensureAuthenticated(callback) else { return }
+        guard sceneReady else {
+            invoke(callback, error(1004, "Glasses scene is not ready. Open customView or customApp first."))
+            return
+        }
+        if photoTaking {
+            invoke(callback, error(1004, "A photo request is already running"))
+            return
+        }
+        photoTaking = true
+        pendingPhotoCallback = callback
+        let width = intOption(options, "width", 1024)
+        let height = intOption(options, "height", 768)
+        let quality = intOption(options, "quality", 80)
+        client.takePhotoWithData(width: width, height: height, quality: quality) { [weak self] data in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.photoTaking = false
+                do {
+                    let path = try self.savePhoto(data)
+                    let payload = self.stateJson().merging([
+                        "path": path,
+                        "size": data.count
+                    ]) { _, new in new }
+                    self.emit("photoReceived", payload)
+                    self.invoke(self.pendingPhotoCallback, self.ok(payload))
+                } catch {
+                    self.emit("photoError", self.stateJson().merging(["message": error.localizedDescription]) { _, new in new })
+                    self.invoke(self.pendingPhotoCallback, self.error(1005, error.localizedDescription))
+                }
+                self.pendingPhotoCallback = nil
+            }
+        }
+    }
+
+    public func sendCustomCommand(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        guard ensureAuthenticated(callback) else { return }
+        let key = stringOption(options, "key", "rk_custom_client")
+        let payload = commandPayload(options)
+        client.sendCustomCmd(cmd: key, payload: payload)
+        invoke(callback, ok(stateJson().merging(["key": key]) { _, new in new }))
+    }
+
+    public func startVideoRecord(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        sendVideoCommand(options, callback: callback, command: "startVideoRecord")
+    }
+
+    public func stopVideoRecord(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        sendVideoCommand(options, callback: callback, command: "stopVideoRecord")
+    }
+
+    public func isBluetoothConnected(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        invoke(callback, ok(stateJson().merging(["connected": client.auth.isAuthenticated()]) { _, new in new }))
+    }
+
+    public func requestSystemInfo(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        invoke(callback, ok(stateJson().merging([
+            "platform": "ios",
+            "sdk": "RGCxrClient"
+        ]) { _, new in new }))
+    }
+
+    public func requestGlassDeviceInfo(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        deviceName = currentDeviceName()
+        invoke(callback, ok(stateJson().merging([
+            "platform": "ios",
+            "glassIdSource": currentGlassId().isEmpty ? "unavailable" : "connectedDeviceName",
+            "glassIdStable": false
+        ]) { _, new in new }))
+    }
+
+    public func getState(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        invoke(callback, ok(stateJson()))
+    }
+
+    public func releaseSession(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        if audioStarted {
+            client.stopRecord(audioType)
+        }
+        _ = finalizeAudioStop(reason: "release", sendStop: true, uploadWait: 3.0)
+        sceneReady = false
+        audioCodecType = -1
+        invoke(callback, ok(stateJson()))
+    }
+
+    public static func handleOpenURL(_ url: URL) -> Bool {
+        return CxrClient.shared.handleOpenURL(url)
+    }
+
+    public static func bootstrapDefault() {
+        guard !initialized else { return }
+        CxrClient.initialize(mode: .customView, options: .init(appDisplayName: nil, pageName: nil))
+        initialized = true
+        initializedSessionType = "customView"
+    }
+
+    private func bindEvents() {
+        guard cancellables.isEmpty else { return }
+
+        client.auth.eventPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                self?.handleAuthEvent(event)
+            }
+            .store(in: &cancellables)
+
+        client.audioEventPublisher
+            .sink { [weak self] event in
+                guard let self = self else { return }
+                switch event {
+                case .started(let info):
+                    self.audioQueue.async {
+                        self.audioStarted = true
+                        self.emit("audioStateChanged", self.stateJson().merging([
+                            "codec": "\(info.codec)",
+                            "type": "\(info.type)",
+                            "channels": "\(info.channels)"
+                        ]) { _, new in new })
+                    }
+                case .stream(let packet):
+                    self.audioQueue.async {
+                        self.handleAudioData(packet.data, timestamp: packet.timestamp)
+                    }
+                }
+            }
+            .store(in: &cancellables)
+
+        client.customViewRunningEventPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                guard let self = self else { return }
+                self.sceneReady = event.isRunning
+                self.emit(event.isRunning ? "customViewOpened" : "customViewClosed", self.stateJson())
+            }
+            .store(in: &cancellables)
+
+        client.appResumeChangeEventPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                self?.emit("appResume", self?.stateJson().merging([
+                    "packageName": event.packageName
+                ]) { _, new in new } ?? [:])
+            }
+            .store(in: &cancellables)
+
+        client.setNotifyEventListenCmds(["rk_custom_key"])
+        client.notifyEventPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                guard let self = self else { return }
+                var payload = self.stateJson()
+                payload["cmd"] = event.cmd
+                payload["subCmd"] = event.subCmd
+                if let data = event.payload {
+                    payload["base64"] = data.base64EncodedString()
+                    payload["text"] = String(data: data, encoding: .utf8) ?? ""
+                }
+                self.emit("customCommandResult", payload)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func handleAuthEvent(_ event: RGCxrClientAuthEvent) {
+        switch event {
+        case .authenticationSucceeded(let nextToken, let nextSessionId, let deviceName):
+            token = nextToken
+            sessionId = nextSessionId ?? ""
+            self.deviceName = deviceName ?? currentDeviceName()
+            emit("authorization", stateJson().merging([
+                "token": token,
+                "sessionId": sessionId,
+                "deviceName": self.deviceName
+            ]) { _, new in new })
+        case .authenticationFailed(let authError):
+            emit("authorization", stateJson().merging([
+                "message": "\(authError)"
+            ]) { _, new in new })
+        case .tokenExpired:
+            token = ""
+            emit("authorization", stateJson().merging(["message": "tokenExpired"]) { _, new in new })
+        case .stateChanged:
+            emit("authorizationState", stateJson())
+        }
+    }
+
+    private func initializeIfNeeded(_ nextType: String) {
+        if Self.initialized {
+            return
+        }
+        if nextType == "customApp" {
+            CxrClient.initialize(mode: .customApp, options: .init(appDisplayName: "宅喔经纪人", pageName: packageName))
+            Self.initializedSessionType = "customApp"
+        } else {
+            CxrClient.initialize(mode: .customView, options: .init(appDisplayName: nil, pageName: nil))
+            Self.initializedSessionType = "customView"
+        }
+        Self.initialized = true
+    }
+
+    private func ensureAuthenticated(_ callback: RokidGlassCallback?) -> Bool {
+        if client.auth.isAuthenticated() {
+            return true
+        }
+        invoke(callback, error(1002, "Rokid authorization is required"))
+        return false
+    }
+
+    private func sendVideoCommand(_ options: NSDictionary?, callback: RokidGlassCallback?, command: String) {
+        let payloadOptions = NSMutableDictionary(dictionary: options ?? [:])
+        payloadOptions["command"] = stringOption(options, "command", command)
+        if payloadOptions["params"] == nil {
+            payloadOptions["params"] = ["source": "agent-app-ios"]
+        }
+        sendCustomCommand(payloadOptions, callback: callback)
+    }
+
+    private func handleAudioData(_ data: Data, timestamp: UInt64) {
+        guard audioStarted else { return }
+        guard let handle = pcmFileHandle else {
+            emit("audioWriteError", stateJson().merging(["message": "PCM file handle is not open"]) { _, new in new })
+            return
+        }
+        handle.write(data)
+        audioBytes += data.count
+        audioChunkCount += 1
+
+        if nativeAudioUploadEnabled, let uploader = nativeAudioUploader {
+            uploader.enqueue(data, session: audioSessionId)
+        } else {
+            audioRealtimeBuffer.append(data)
+            let elapsed = Date().timeIntervalSince(lastAudioEmitAt)
+            if audioRealtimeBuffer.count >= realtimeMinBytes || elapsed >= realtimeMaxInterval {
+                flushRealtimeAudio(final: false, timestamp: timestamp)
+            }
+        }
+    }
+
+    private func flushRealtimeAudio(final: Bool, timestamp: UInt64 = 0) {
+        guard !audioRealtimeBuffer.isEmpty else { return }
+        audioRealtimeSeq += 1
+        let chunk = audioRealtimeBuffer
+        audioRealtimeBuffer.removeAll(keepingCapacity: true)
+        lastAudioEmitAt = Date()
+        let audioPayload: [String: Any] = [
+            "sequence": audioRealtimeSeq,
+            "base64": chunk.base64EncodedString(),
+            "bytes": chunk.count,
+            "final": final,
+            "timestamp": timestamp,
+            "codec": "pcm",
+            "sampleRate": sampleRate,
+            "channels": channels,
+            "bitsPerSample": bitsPerSample
+        ].merging(pcmLevelStats(chunk)) { _, new in new }
+        emit("audioChunk", stateJson().merging(audioPayload) { _, new in new })
+    }
+
+    private func pcmLevelStats(_ data: Data) -> [String: Any] {
+        guard data.count >= 2 else {
+            return [
+                "sampleCount": 0,
+                "avgAbs": 0,
+                "maxAbs": 0,
+                "nonZeroSamples": 0,
+                "silentLike": true
+            ]
+        }
+        var sumAbs = 0
+        var maxAbs = 0
+        var nonZero = 0
+        var index = data.startIndex
+        var sampleCount = 0
+        while index < data.endIndex {
+            let next = data.index(after: index)
+            if next >= data.endIndex { break }
+            let value = UInt16(data[index]) | (UInt16(data[next]) << 8)
+            let sample = Int16(bitPattern: value)
+            let absValue = abs(Int(sample))
+            sumAbs += absValue
+            maxAbs = max(maxAbs, absValue)
+            if sample != 0 { nonZero += 1 }
+            sampleCount += 1
+            index = data.index(after: next)
+        }
+        return [
+            "sampleCount": sampleCount,
+            "avgAbs": sampleCount == 0 ? 0 : Double(sumAbs) / Double(sampleCount),
+            "maxAbs": maxAbs,
+            "nonZeroSamples": nonZero,
+            "silentLike": maxAbs <= 2
+        ]
+    }
+
+    private func resetAudioBuffers() -> Bool {
+        closePcmFile()
+        audioRealtimeBuffer.removeAll(keepingCapacity: true)
+        audioBytes = 0
+        audioChunkCount = 0
+        audioRealtimeSeq = 0
+        audioSessionId += 1
+        lastAudioEmitAt = Date.distantPast
+        let base = mediaDirectory()
+        let timestamp = fileTimestamp()
+        pcmPath = base.appendingPathComponent("rokid_\(timestamp).pcm").path
+        wavPath = base.appendingPathComponent("rokid_\(timestamp).wav").path
+        FileManager.default.createFile(atPath: pcmPath, contents: nil)
+        do {
+            pcmFileHandle = try FileHandle(forWritingTo: URL(fileURLWithPath: pcmPath))
+            return true
+        } catch {
+            pcmFileHandle = nil
+            emit("audioWriteError", stateJson().merging(["message": error.localizedDescription]) { _, new in new })
+            return false
+        }
+    }
+
+    private func saveAudioFiles() -> [String: Any] {
+        closePcmFile()
+        if pcmPath.isEmpty || wavPath.isEmpty {
+            return [
+                "pcmPath": pcmPath,
+                "path": wavPath,
+                "bytes": audioBytes,
+                "chunkCount": audioChunkCount,
+                "durationSeconds": 0
+            ]
+        }
+        do {
+            try buildWavFromPcm(pcmPath: pcmPath, wavPath: wavPath, pcmSize: audioBytes)
+        } catch {
+            emit("audioWriteError", stateJson().merging(["message": error.localizedDescription]) { _, new in new })
+        }
+        return [
+            "pcmPath": pcmPath,
+            "path": wavPath,
+            "wavPath": wavPath,
+            "bytes": audioBytes,
+            "chunkCount": audioChunkCount,
+            "durationSeconds": Double(audioBytes) / Double(sampleRate * channels * bitsPerSample / 8)
+        ]
+    }
+
+    private func finalizeAudioStop(reason: String, sendStop: Bool, uploadWait: TimeInterval) -> [String: Any] {
+        return audioQueue.sync {
+            let stoppedCodecType = audioCodecType
+            audioStarted = false
+            if nativeAudioUploadEnabled || nativeAudioUploader != nil {
+                stopNativeAudioUpload(sendStop: sendStop, wait: uploadWait)
+            } else {
+                flushRealtimeAudio(final: true)
+            }
+            let saved = saveAudioFiles()
+            emit("audioStateChanged", stateJson())
+            audioCodecType = -1
+            nativeAudioUploadEnabled = false
+            var data = stateJson().merging(saved) { _, new in new }
+            data["codecType"] = stoppedCodecType
+            data["audioCodecType"] = stoppedCodecType
+            data["stopReason"] = reason
+            return data
+        }
+    }
+
+    private func startNativeAudioUpload(_ options: NSDictionary?, session: Int64) {
+        stopNativeAudioUpload(sendStop: false, wait: 1.0)
+        nativeAudioUploadEnabled = true
+        nativeAudioUploadState = "starting"
+        nativeAudioUploadError = ""
+        nativeAudioEnqueuedBytes = 0
+        nativeAudioDroppedBytes = 0
+        nativeAudioSentBytes = 0
+        nativeAudioSentChunks = 0
+        let uploader = RokidNativeAudioUploader(
+            options: options,
+            session: session,
+            defaultChunkBytes: 16000,
+            eventHandler: { [weak self] event, message, stats in
+                guard let self = self else { return }
+                self.audioQueue.async {
+                    guard self.audioSessionId == session else { return }
+                    self.applyNativeUploadStats(stats)
+                    if !message.isEmpty {
+                        self.nativeAudioUploadError = message
+                    }
+                    self.emitNativeUploadEvent(event, message: message)
+                }
+            },
+            messageHandler: { [weak self] message in
+                guard let self = self else { return }
+                self.audioQueue.async {
+                    guard self.audioSessionId == session else { return }
+                    self.emit("nativeUploadMessage", self.stateJson().merging(["message": message]) { _, new in new })
+                }
+            }
+        )
+        nativeAudioUploader = uploader
+        uploader.start()
+    }
+
+    private func stopNativeAudioUpload(sendStop: Bool, wait: TimeInterval) {
+        let uploader = nativeAudioUploader
+        nativeAudioUploader = nil
+        uploader?.stop(sendStop: sendStop, wait: wait)
+        nativeAudioUploadEnabled = false
+        if uploader == nil && nativeAudioUploadState != "idle" {
+            nativeAudioUploadState = "stopped"
+        }
+    }
+
+    private func applyNativeUploadStats(_ stats: RokidNativeAudioUploader.Stats) {
+        nativeAudioUploadState = stats.state
+        nativeAudioUploadError = stats.error
+        nativeAudioEnqueuedBytes = stats.enqueuedBytes
+        nativeAudioDroppedBytes = stats.droppedBytes
+        nativeAudioSentBytes = stats.sentBytes
+        nativeAudioSentChunks = stats.sentChunks
+    }
+
+    private func emitNativeUploadEvent(_ event: String, message: String) {
+        var payload = stateJson()
+        payload["nativeUpload"] = nativeAudioUploadEnabled
+        payload["nativeUploadState"] = nativeAudioUploadState
+        payload["nativeUploadError"] = message.isEmpty ? nativeAudioUploadError : message
+        emit(event, payload)
+    }
+
+    private func closePcmFile() {
+        guard let handle = pcmFileHandle else { return }
+        handle.synchronizeFile()
+        handle.closeFile()
+        pcmFileHandle = nil
+    }
+
+    private func buildWavFromPcm(pcmPath: String, wavPath: String, pcmSize: Int) throws {
+        let pcmURL = URL(fileURLWithPath: pcmPath)
+        let wavURL = URL(fileURLWithPath: wavPath)
+        let wav = try FileHandle(forWritingTo: createEmptyFile(wavURL))
+        defer { wav.closeFile() }
+        wav.write(wavHeader(dataSize: pcmSize))
+        let pcm = try FileHandle(forReadingFrom: pcmURL)
+        defer { pcm.closeFile() }
+        while true {
+            let data = pcm.readData(ofLength: 4096)
+            if data.isEmpty { break }
+            wav.write(data)
+        }
+    }
+
+    private func createEmptyFile(_ url: URL) -> URL {
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+        return url
+    }
+
+    private func savePhoto(_ data: Data) throws -> String {
+        let path = mediaDirectory().appendingPathComponent("photo_\(fileTimestamp()).jpg").path
+        try data.write(to: URL(fileURLWithPath: path), options: .atomic)
+        return path
+    }
+
+    private func mediaDirectory() -> URL {
+        let root = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let dir = root.appendingPathComponent("RokidGlass", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: dir.path) {
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+        return dir
+    }
+
+    private func fileTimestamp() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        return formatter.string(from: Date())
+    }
+
+    private func wavHeader(dataSize pcmSize: Int) -> Data {
+        var header = Data()
+        let byteRate = sampleRate * channels * bitsPerSample / 8
+        let blockAlign = channels * bitsPerSample / 8
+        let dataSize = UInt32(pcmSize)
+        let riffSize = UInt32(36 + pcmSize)
+
+        header.append("RIFF".data(using: .ascii)!)
+        appendLE(riffSize, to: &header)
+        header.append("WAVE".data(using: .ascii)!)
+        header.append("fmt ".data(using: .ascii)!)
+        appendLE(UInt32(16), to: &header)
+        appendLE(UInt16(1), to: &header)
+        appendLE(UInt16(channels), to: &header)
+        appendLE(UInt32(sampleRate), to: &header)
+        appendLE(UInt32(byteRate), to: &header)
+        appendLE(UInt16(blockAlign), to: &header)
+        appendLE(UInt16(bitsPerSample), to: &header)
+        header.append("data".data(using: .ascii)!)
+        appendLE(dataSize, to: &header)
+        return header
+    }
+
+    private func appendLE<T: FixedWidthInteger>(_ value: T, to data: inout Data) {
+        var little = value.littleEndian
+        withUnsafeBytes(of: &little) { data.append(contentsOf: $0) }
+    }
+
+    private func commandPayload(_ options: NSDictionary?) -> Data {
+        let base64 = stringOption(options, "base64", "")
+        if !base64.isEmpty, let data = Data(base64Encoded: base64) {
+            return data
+        }
+        let text = stringOption(options, "text", "")
+        if !text.isEmpty {
+            return text.data(using: .utf8) ?? Data()
+        }
+        var payload: [String: Any] = [
+            "command": stringOption(options, "command", "message"),
+            "params": options?["params"] ?? [:]
+        ]
+        if let raw = options?["payload"] {
+            payload["payload"] = raw
+        }
+        return (try? JSONSerialization.data(withJSONObject: payload, options: [])) ?? Data()
+    }
+
+    private func defaultCustomViewJson(title: String, text: String) -> String {
+        let root: [String: Any] = [
+            "type": "LinearLayout",
+            "props": [
+                "id": "root",
+                "layout_width": "match_parent",
+                "layout_height": "match_parent",
+                "orientation": "vertical",
+                "gravity": "center_horizontal",
+                "marginTop": "160dp",
+                "marginBottom": "80dp",
+                "backgroundColor": "#FF000000"
+            ],
+            "children": [
+                [
+                    "type": "TextView",
+                    "props": [
+                        "id": "titleView",
+                        "layout_width": "wrap_content",
+                        "layout_height": "wrap_content",
+                        "text": title,
+                        "textColor": "#FFFFFF",
+                        "textSize": "20sp",
+                        "gravity": "center",
+                        "textStyle": "bold",
+                        "paddingStart": "16dp",
+                        "paddingEnd": "16dp"
+                    ]
+                ],
+                [
+                    "type": "TextView",
+                    "props": [
+                        "id": "textView",
+                        "layout_width": "wrap_content",
+                        "layout_height": "wrap_content",
+                        "text": text,
+                        "textColor": "#00FF00",
+                        "textSize": "16sp",
+                        "gravity": "center",
+                        "marginTop": "16dp",
+                        "paddingStart": "16dp",
+                        "paddingEnd": "16dp"
+                    ]
+                ]
+            ]
+        ]
+        return jsonString(root)
+    }
+
+    private func defaultUpdateJson(text: String) -> String {
+        return jsonString([
+            [
+                "action": "update",
+                "id": "textView",
+                "props": ["text": text]
+            ]
+        ])
+    }
+
+    private func jsonString(_ value: Any) -> String {
+        guard JSONSerialization.isValidJSONObject(value),
+              let data = try? JSONSerialization.data(withJSONObject: value, options: []),
+              let string = String(data: data, encoding: .utf8) else {
+            return ""
+        }
+        return string
+    }
+
+    private func stringOption(_ options: NSDictionary?, _ key: String, _ defaultValue: String) -> String {
+        guard let value = options?[key] else { return defaultValue }
+        if let string = value as? String { return string }
+        return "\(value)"
+    }
+
+    private func intOption(_ options: NSDictionary?, _ key: String, _ defaultValue: Int) -> Int {
+        guard let value = options?[key] else { return defaultValue }
+        if let int = value as? Int { return int }
+        if let number = value as? NSNumber { return number.intValue }
+        if let string = value as? String, let int = Int(string) { return int }
+        return defaultValue
+    }
+
+    private func boolOption(_ options: NSDictionary?, _ key: String, _ defaultValue: Bool) -> Bool {
+        guard let value = options?[key] else { return defaultValue }
+        if let bool = value as? Bool { return bool }
+        if let number = value as? NSNumber { return number.boolValue }
+        if let string = value as? String {
+            let lower = string.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if ["true", "1", "yes", "y"].contains(lower) { return true }
+            if ["false", "0", "no", "n"].contains(lower) { return false }
+        }
+        return defaultValue
+    }
+
+    private func stateJson() -> [String: Any] {
+        let currentSessionId = sessionId.isEmpty ? (client.auth.currentSessionId ?? "") : sessionId
+        let currentName = currentDeviceName()
+        let glassId = currentGlassId()
+        return [
+            "sessionType": sessionType,
+            "packageName": packageName,
+            "hasToken": client.auth.isAuthenticated() || !token.isEmpty,
+            "ready": client.auth.isAuthenticated() || !token.isEmpty,
+            "cxrConnected": client.auth.isAuthenticated() || !token.isEmpty,
+            "glassBtConnected": client.auth.isAuthenticated() || !token.isEmpty,
+            "sceneReady": sceneReady,
+            "audioStarted": audioStarted,
+            "audioCodecType": audioCodecType,
+            "codecType": audioCodecType,
+            "audioSessionId": audioSessionId,
+            "audioChunkCount": audioChunkCount,
+            "pcmPath": pcmPath,
+            "path": wavPath,
+            "bridgeVersion": bridgeVersion,
+            "nativeUpload": nativeAudioUploadEnabled,
+            "nativeUploadState": nativeAudioUploadState,
+            "nativeUploadError": nativeAudioUploadError,
+            "nativeUploadEnqueuedBytes": nativeAudioEnqueuedBytes,
+            "nativeUploadDroppedBytes": nativeAudioDroppedBytes,
+            "nativeUploadSentBytes": nativeAudioSentBytes,
+            "nativeUploadSentChunks": nativeAudioSentChunks,
+            "photoTaking": photoTaking,
+            "glassId": glassId,
+            "glassIdSource": glassId.isEmpty ? "unavailable" : "connectedDeviceName",
+            "glassIdStable": false,
+            "deviceId": glassId,
+            "sn": "",
+            "deviceName": currentName,
+            "sessionId": currentSessionId,
+            "glassDeviceInfo": [
+                "glassId": glassId,
+                "glassIdSource": glassId.isEmpty ? "unavailable" : "connectedDeviceName",
+                "glassIdStable": false,
+                "deviceId": glassId,
+                "sn": "",
+                "deviceName": currentName,
+                "sessionId": currentSessionId
+            ]
+        ]
+    }
+
+    private func currentDeviceName() -> String {
+        if let name = client.auth.currentDeviceName, !name.isEmpty {
+            return name
+        }
+        if let name = RGCxrClientBLE.shared.connectedDeviceName, !name.isEmpty {
+            return name
+        }
+        return deviceName
+    }
+
+    private func currentGlassId() -> String {
+        if let name = RGCxrClientBLE.shared.connectedDeviceName, !name.isEmpty {
+            return name
+        }
+        return ""
+    }
+
+    private func ok(_ data: [String: Any]) -> [String: Any] {
+        return ["code": 0, "data": data]
+    }
+
+    private func error(_ code: Int, _ message: String) -> [String: Any] {
+        return ["code": code, "message": message]
+    }
+
+    private func invoke(_ callback: RokidGlassCallback?, _ result: [String: Any]) {
+        DispatchQueue.main.async {
+            callback?(result, false)
+        }
+    }
+
+    private func invokeKeepAlive(_ callback: RokidGlassCallback?, _ result: [String: Any]) {
+        DispatchQueue.main.async {
+            callback?(result, true)
+        }
+    }
+
+    private func emit(_ event: String, _ data: [String: Any]) {
+        var payload = data
+        payload["event"] = event
+        invokeKeepAlive(eventCallback, ok(payload))
+    }
+}
+
+private final class RokidNativeAudioUploader: NSObject {
+    struct Stats {
+        var state: String
+        var error: String
+        var enqueuedBytes: Int
+        var droppedBytes: Int
+        var sentBytes: Int
+        var sentChunks: Int
+    }
+
+    private let condition = NSCondition()
+    private var queue: [Data] = []
+    private var queueBytes = 0
+    private let wsUrl: String
+    private let headers: [String: String]
+    private let sessionData: [String: Any]
+    private let startPayload: [String: Any]
+    private let stopPayload: [String: Any]
+    private let chunkBytes: Int
+    private let maxQueueBytes: Int
+    private let session: Int64
+    private let eventHandler: (String, String, Stats) -> Void
+    private let messageHandler: (String) -> Void
+    private var pending = Data()
+    private var thread: Thread?
+    private var urlSession: URLSession?
+    private var socketTask: URLSessionWebSocketTask?
+    private var stoppedSemaphore = DispatchSemaphore(value: 0)
+    private var running = true
+    private var sendStopOnClose = false
+    private var state = "idle"
+    private var errorMessage = ""
+    private var enqueuedBytes = 0
+    private var droppedBytes = 0
+    private var sentBytes = 0
+    private var sentChunks = 0
+
+    init(
+        options: NSDictionary?,
+        session: Int64,
+        defaultChunkBytes: Int,
+        eventHandler: @escaping (String, String, Stats) -> Void,
+        messageHandler: @escaping (String) -> Void
+    ) {
+        self.session = session
+        self.eventHandler = eventHandler
+        self.messageHandler = messageHandler
+        self.wsUrl = RokidNativeAudioUploader.absoluteWsUrl(RokidNativeAudioUploader.stringOption(options, "wsUrl", ""))
+        self.headers = RokidNativeAudioUploader.stringDictionaryOption(options, "headers")
+        self.sessionData = RokidNativeAudioUploader.dictionaryOption(options, "sessionData")
+        self.chunkBytes = max(640, RokidNativeAudioUploader.intOption(options, "chunkBytes", defaultChunkBytes))
+        let queueChunks = max(60, RokidNativeAudioUploader.intOption(options, "maxQueueChunks", 240))
+        self.maxQueueBytes = max(self.chunkBytes * 10, self.chunkBytes * queueChunks)
+        let providedStart = RokidNativeAudioUploader.dictionaryOption(options, "startPayload")
+        let providedStop = RokidNativeAudioUploader.dictionaryOption(options, "stopPayload")
+        self.startPayload = providedStart.isEmpty
+            ? RokidNativeAudioUploader.defaultPayload(event: "session.start", sessionData: self.sessionData, session: session, audio: nil, index: 0, bytes: 0, final: false, chunkBytes: self.chunkBytes)
+            : providedStart
+        self.stopPayload = providedStop.isEmpty
+            ? RokidNativeAudioUploader.defaultPayload(event: "session.stop", sessionData: self.sessionData, session: session, audio: nil, index: 0, bytes: 0, final: true, chunkBytes: self.chunkBytes)
+            : providedStop
+        super.init()
+    }
+
+    func start() {
+        let next = Thread { [weak self] in
+            self?.runLoop()
+        }
+        next.name = "RokidGlassNativeUpload"
+        thread = next
+        next.start()
+    }
+
+    func enqueue(_ data: Data, session nextSession: Int64) {
+        guard !data.isEmpty, nextSession == session else { return }
+        condition.lock()
+        defer {
+            condition.signal()
+            condition.unlock()
+        }
+        guard running else { return }
+        queue.append(data)
+        queueBytes += data.count
+        enqueuedBytes += data.count
+        while queueBytes > maxQueueBytes, !queue.isEmpty {
+            let dropped = queue.removeFirst()
+            queueBytes -= dropped.count
+            droppedBytes += dropped.count
+        }
+    }
+
+    func stop(sendStop: Bool, wait: TimeInterval) {
+        condition.lock()
+        sendStopOnClose = sendStop
+        running = false
+        condition.signal()
+        condition.unlock()
+        _ = stoppedSemaphore.wait(timeout: .now() + max(0.1, wait))
+        socketTask?.cancel(with: .normalClosure, reason: nil)
+        urlSession?.invalidateAndCancel()
+    }
+
+    private func runLoop() {
+        do {
+            state = "connecting"
+            try connect()
+            state = "connected"
+            receiveLoop()
+            try sendJSON(startPayload)
+            emit("nativeUploadStarted")
+            var lastStatsAt = Date.distantPast
+            while true {
+                if let next = pollQueue(wait: running ? 0.25 : 0.0) {
+                    pending.append(next)
+                }
+                try flushUploadChunks(final: false)
+                if Date().timeIntervalSince(lastStatsAt) >= 1.0 {
+                    lastStatsAt = Date()
+                    emit("nativeUploadStats")
+                }
+                if !running && queue.isEmpty && pending.isEmpty {
+                    break
+                }
+            }
+            try flushUploadChunks(final: true)
+            if sendStopOnClose {
+                try sendJSON(stopPayload)
+            }
+            state = "stopped"
+            emit("nativeUploadStopped")
+        } catch {
+            state = "error"
+            errorMessage = error.localizedDescription
+            emit("nativeUploadError", message: errorMessage)
+        }
+        socketTask?.cancel(with: .normalClosure, reason: nil)
+        urlSession?.invalidateAndCancel()
+        condition.lock()
+        queue.removeAll()
+        queueBytes = 0
+        condition.unlock()
+        stoppedSemaphore.signal()
+    }
+
+    private func connect() throws {
+        guard let url = URL(string: wsUrl), let scheme = url.scheme, ["ws", "wss"].contains(scheme.lowercased()) else {
+            throw NSError(domain: "RokidNativeAudioUploader", code: 1001, userInfo: [NSLocalizedDescriptionKey: "Unsupported websocket url: \(wsUrl)"])
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        for (key, value) in headers {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+        let session = URLSession(configuration: .default)
+        urlSession = session
+        socketTask = session.webSocketTask(with: request)
+        socketTask?.resume()
+    }
+
+    private func receiveLoop() {
+        socketTask?.receive { [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .success(let message):
+                switch message {
+                case .string(let text):
+                    if !text.isEmpty {
+                        self.messageHandler(text)
+                    }
+                case .data(let data):
+                    if !data.isEmpty {
+                        self.messageHandler(data.base64EncodedString())
+                    }
+                @unknown default:
+                    break
+                }
+                if self.running {
+                    self.receiveLoop()
+                }
+            case .failure(let error):
+                if self.running {
+                    self.errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func pollQueue(wait: TimeInterval) -> Data? {
+        condition.lock()
+        defer { condition.unlock() }
+        if queue.isEmpty, wait > 0, running {
+            condition.wait(until: Date().addingTimeInterval(wait))
+        }
+        guard !queue.isEmpty else { return nil }
+        let data = queue.removeFirst()
+        queueBytes -= data.count
+        return data
+    }
+
+    private func flushUploadChunks(final: Bool) throws {
+        guard !pending.isEmpty else { return }
+        if !final, pending.count < chunkBytes { return }
+        var offset = 0
+        while pending.count - offset >= chunkBytes {
+            let chunk = pending.subdata(in: offset..<(offset + chunkBytes))
+            try sendAudioChunk(chunk, final: false)
+            offset += chunkBytes
+        }
+        let remaining = pending.count - offset
+        if remaining <= 0 {
+            pending.removeAll(keepingCapacity: true)
+            return
+        }
+        let tail = pending.subdata(in: offset..<pending.count)
+        pending.removeAll(keepingCapacity: true)
+        if final {
+            try sendAudioChunk(tail, final: true)
+        } else {
+            pending.append(tail)
+        }
+    }
+
+    private func sendAudioChunk(_ data: Data, final: Bool) throws {
+        guard !data.isEmpty else { return }
+        let index = sentChunks + 1
+        let payload = RokidNativeAudioUploader.defaultPayload(
+            event: "audio.chunk",
+            sessionData: sessionData,
+            session: session,
+            audio: data,
+            index: index,
+            bytes: data.count,
+            final: final,
+            chunkBytes: chunkBytes
+        )
+        try sendJSON(payload)
+        sentChunks = index
+        sentBytes += data.count
+    }
+
+    private func sendJSON(_ payload: [String: Any]) throws {
+        guard let socketTask = socketTask else {
+            throw NSError(domain: "RokidNativeAudioUploader", code: 1002, userInfo: [NSLocalizedDescriptionKey: "WebSocket is not connected"])
+        }
+        guard JSONSerialization.isValidJSONObject(payload) else {
+            throw NSError(domain: "RokidNativeAudioUploader", code: 1003, userInfo: [NSLocalizedDescriptionKey: "Invalid websocket payload"])
+        }
+        let data = try JSONSerialization.data(withJSONObject: payload, options: [])
+        let text = String(data: data, encoding: .utf8) ?? "{}"
+        let semaphore = DispatchSemaphore(value: 0)
+        var sendError: Error?
+        socketTask.send(.string(text)) { error in
+            sendError = error
+            semaphore.signal()
+        }
+        if semaphore.wait(timeout: .now() + 10) == .timedOut {
+            throw NSError(domain: "RokidNativeAudioUploader", code: 1004, userInfo: [NSLocalizedDescriptionKey: "WebSocket send timed out"])
+        }
+        if let sendError = sendError {
+            throw sendError
+        }
+    }
+
+    private func emit(_ event: String, message: String = "") {
+        eventHandler(event, message, snapshot())
+    }
+
+    private func snapshot() -> Stats {
+        return Stats(
+            state: state,
+            error: errorMessage,
+            enqueuedBytes: enqueuedBytes,
+            droppedBytes: droppedBytes,
+            sentBytes: sentBytes,
+            sentChunks: sentChunks
+        )
+    }
+
+    private static func defaultPayload(event: String, sessionData: [String: Any], session: Int64, audio: Data?, index: Int, bytes: Int, final: Bool, chunkBytes: Int) -> [String: Any] {
+        var data = sessionData
+        data["type"] = event
+        data["messageType"] = event
+        data["audioTransport"] = "websocket-json-base64"
+        data["transport"] = "json"
+        data["codec"] = "pcm"
+        data["format"] = "pcm_s16le"
+        data["mimeType"] = "audio/pcm"
+        data["sampleRate"] = 16000
+        data["channels"] = 1
+        data["bitsPerSample"] = 16
+        data["endian"] = "little"
+        data["timestamp"] = Int64(Date().timeIntervalSince1970 * 1000)
+        data["audioSessionId"] = session
+        data["nativeUpload"] = true
+        data["chunkBytes"] = bytes > 0 ? bytes : chunkBytes
+        data["chunkDurationMs"] = bytes > 0 ? Int(round(Double(bytes) / 2.0 / 16000.0 * 1000.0)) : 0
+        if event == "audio.chunk", let audio = audio {
+            let stats = pcmLevelStats(audio)
+            data["chunkIndex"] = index
+            data["chunkSeq"] = index
+            data["bytes"] = bytes
+            data["final"] = final
+            data["chunkBase64"] = audio.base64EncodedString()
+            data["pcmAvgAbs"] = stats.avgAbs
+            data["pcmMaxAbs"] = stats.maxAbs
+            data["pcmNonZeroSamples"] = stats.nonZeroSamples
+            data["pcmNonZeroBytes"] = stats.nonZeroBytes
+            data["pcmSilentLike"] = stats.maxAbs <= 2
+            data["pcmFirstBytesHex"] = stats.firstBytesHex
+            data["pcmGain"] = 1
+        }
+        return ["event": event, "data": data]
+    }
+
+    private struct PcmStats {
+        let sampleCount: Int
+        let avgAbs: Double
+        let maxAbs: Int
+        let nonZeroSamples: Int
+        let nonZeroBytes: Int
+        let firstBytesHex: String
+    }
+
+    private static func pcmLevelStats(_ data: Data) -> PcmStats {
+        guard data.count >= 2 else {
+            return PcmStats(sampleCount: 0, avgAbs: 0, maxAbs: 0, nonZeroSamples: 0, nonZeroBytes: 0, firstBytesHex: "")
+        }
+        var sumAbs = 0
+        var maxAbs = 0
+        var nonZeroSamples = 0
+        var nonZeroBytes = 0
+        for byte in data where byte != 0 {
+            nonZeroBytes += 1
+        }
+        var index = data.startIndex
+        var sampleCount = 0
+        while index < data.endIndex {
+            let next = data.index(after: index)
+            if next >= data.endIndex { break }
+            let value = UInt16(data[index]) | (UInt16(data[next]) << 8)
+            let sample = Int16(bitPattern: value)
+            let absValue = abs(Int(sample))
+            sumAbs += absValue
+            maxAbs = max(maxAbs, absValue)
+            if sample != 0 { nonZeroSamples += 1 }
+            sampleCount += 1
+            index = data.index(after: next)
+        }
+        let firstBytes = data.prefix(8).map { String(format: "%02x", Int($0)) }.joined()
+        return PcmStats(
+            sampleCount: sampleCount,
+            avgAbs: sampleCount == 0 ? 0 : Double(sumAbs) / Double(sampleCount),
+            maxAbs: maxAbs,
+            nonZeroSamples: nonZeroSamples,
+            nonZeroBytes: nonZeroBytes,
+            firstBytesHex: firstBytes
+        )
+    }
+
+    private static func absoluteWsUrl(_ url: String) -> String {
+        let value = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.hasPrefix("ws://") || value.hasPrefix("wss://") { return value }
+        if value.hasPrefix("http://") { return "ws://" + String(value.dropFirst("http://".count)) }
+        if value.hasPrefix("https://") { return "wss://" + String(value.dropFirst("https://".count)) }
+        return value
+    }
+
+    private static func dictionaryOption(_ options: NSDictionary?, _ key: String) -> [String: Any] {
+        guard let value = options?[key] else { return [:] }
+        if let dict = value as? [String: Any] { return dict }
+        if let dict = value as? NSDictionary { return dict as? [String: Any] ?? [:] }
+        return [:]
+    }
+
+    private static func stringDictionaryOption(_ options: NSDictionary?, _ key: String) -> [String: String] {
+        let raw = dictionaryOption(options, key)
+        var result: [String: String] = [:]
+        for (key, value) in raw {
+            result[key] = "\(value)"
+        }
+        return result
+    }
+
+    private static func stringOption(_ options: NSDictionary?, _ key: String, _ defaultValue: String) -> String {
+        guard let value = options?[key] else { return defaultValue }
+        if let string = value as? String { return string }
+        return "\(value)"
+    }
+
+    private static func intOption(_ options: NSDictionary?, _ key: String, _ defaultValue: Int) -> Int {
+        guard let value = options?[key] else { return defaultValue }
+        if let int = value as? Int { return int }
+        if let number = value as? NSNumber { return number.intValue }
+        if let string = value as? String, let int = Int(string) { return int }
+        return defaultValue
+    }
+}

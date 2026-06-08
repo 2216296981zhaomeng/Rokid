@@ -1,0 +1,1395 @@
+{
+  "ABIRoot": {
+    "kind": "Root",
+    "name": "RokidCXRLUniPlugin",
+    "printedName": "RokidCXRLUniPlugin",
+    "children": [
+      {
+        "kind": "Import",
+        "name": "Foundation",
+        "printedName": "Foundation",
+        "declKind": "Import",
+        "moduleName": "RokidCXRLUniPlugin"
+      },
+      {
+        "kind": "Import",
+        "name": "Combine",
+        "printedName": "Combine",
+        "declKind": "Import",
+        "moduleName": "RokidCXRLUniPlugin"
+      },
+      {
+        "kind": "Import",
+        "name": "UIKit",
+        "printedName": "UIKit",
+        "declKind": "Import",
+        "moduleName": "RokidCXRLUniPlugin"
+      },
+      {
+        "kind": "Import",
+        "name": "RGCxrClient",
+        "printedName": "RGCxrClient",
+        "declKind": "Import",
+        "moduleName": "RokidCXRLUniPlugin"
+      },
+      {
+        "kind": "Import",
+        "name": "RGCoreKit",
+        "printedName": "RGCoreKit",
+        "declKind": "Import",
+        "moduleName": "RokidCXRLUniPlugin"
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "RokidCXRLBridge",
+        "printedName": "RokidCXRLBridge",
+        "children": [
+          {
+            "kind": "Function",
+            "name": "sharedInstance",
+            "printedName": "sharedInstance()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "RokidCXRLBridge",
+                "printedName": "RokidCXRLUniPlugin.RokidCXRLBridge",
+                "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(cm)sharedInstance",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC14sharedInstanceACyFZ",
+            "moduleName": "RokidCXRLUniPlugin",
+            "static": true,
+            "objc_name": "sharedInstance",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "bindEventsIfNeeded",
+            "printedName": "bindEventsIfNeeded()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)bindEventsIfNeeded",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC18bindEventsIfNeededyyF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "bindEventsIfNeeded",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "initializeClient",
+            "printedName": "initializeClient(_:completion:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.NSDictionary) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "NSDictionary",
+                    "printedName": "Foundation.NSDictionary",
+                    "usr": "c:objc(cs)NSDictionary"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)initializeClient:completion:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC16initializeClient_10completionySo12NSDictionaryC_yAGctF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "initializeClient:completion:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "configureAuth",
+            "printedName": "configureAuth(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)configureAuth:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC13configureAuthySo12NSDictionaryCAFF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "configureAuth:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "authenticate",
+            "printedName": "authenticate(_:completion:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.NSDictionary) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "NSDictionary",
+                    "printedName": "Foundation.NSDictionary",
+                    "usr": "c:objc(cs)NSDictionary"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)authenticate:completion:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC12authenticate_10completionySo12NSDictionaryC_yAGctF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "authenticate:completion:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "refreshToken",
+            "printedName": "refreshToken(_:completion:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.NSDictionary) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "NSDictionary",
+                    "printedName": "Foundation.NSDictionary",
+                    "usr": "c:objc(cs)NSDictionary"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)refreshToken:completion:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC12refreshToken_10completionySo12NSDictionaryC_yAGctF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "refreshToken:completion:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "clearAuthentication",
+            "printedName": "clearAuthentication()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)clearAuthentication",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC19clearAuthenticationSo12NSDictionaryCyF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "clearAuthentication",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "watchEvents",
+            "printedName": "watchEvents(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.NSDictionary) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "NSDictionary",
+                    "printedName": "Foundation.NSDictionary",
+                    "usr": "c:objc(cs)NSDictionary"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)watchEvents:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC11watchEventsyyySo12NSDictionaryCcF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "watchEvents:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "unwatchEvents",
+            "printedName": "unwatchEvents()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)unwatchEvents",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC13unwatchEventsSo12NSDictionaryCyF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "unwatchEvents",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "setNotifyEventListenCmds",
+            "printedName": "setNotifyEventListenCmds(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)setNotifyEventListenCmds:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC24setNotifyEventListenCmdsySo12NSDictionaryCAFF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "setNotifyEventListenCmds:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "sendCustomCmd",
+            "printedName": "sendCustomCmd(_:completion:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.NSDictionary) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "NSDictionary",
+                    "printedName": "Foundation.NSDictionary",
+                    "usr": "c:objc(cs)NSDictionary"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)sendCustomCmd:completion:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC13sendCustomCmd_10completionySo12NSDictionaryC_yAGctF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "sendCustomCmd:completion:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "openCustomView",
+            "printedName": "openCustomView(_:completion:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.NSDictionary) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "NSDictionary",
+                    "printedName": "Foundation.NSDictionary",
+                    "usr": "c:objc(cs)NSDictionary"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)openCustomView:completion:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC14openCustomView_10completionySo12NSDictionaryC_yAGctF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "openCustomView:completion:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "updateCustomView",
+            "printedName": "updateCustomView(_:completion:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.NSDictionary) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "NSDictionary",
+                    "printedName": "Foundation.NSDictionary",
+                    "usr": "c:objc(cs)NSDictionary"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)updateCustomView:completion:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC16updateCustomView_10completionySo12NSDictionaryC_yAGctF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "updateCustomView:completion:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "closeCustomView",
+            "printedName": "closeCustomView(_:completion:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.NSDictionary) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "NSDictionary",
+                    "printedName": "Foundation.NSDictionary",
+                    "usr": "c:objc(cs)NSDictionary"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)closeCustomView:completion:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC15closeCustomView_10completionySo12NSDictionaryC_yAGctF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "closeCustomView:completion:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "sendCustomViewIcons",
+            "printedName": "sendCustomViewIcons(_:completion:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.NSDictionary) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "NSDictionary",
+                    "printedName": "Foundation.NSDictionary",
+                    "usr": "c:objc(cs)NSDictionary"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)sendCustomViewIcons:completion:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC19sendCustomViewIcons_10completionySo12NSDictionaryC_yAGctF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "sendCustomViewIcons:completion:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "startRecord",
+            "printedName": "startRecord(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)startRecord:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC11startRecordySo12NSDictionaryCAFF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "startRecord:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "stopRecord",
+            "printedName": "stopRecord(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)stopRecord:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC10stopRecordySo12NSDictionaryCAFF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "stopRecord:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "startPlayAudio",
+            "printedName": "startPlayAudio(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)startPlayAudio:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC14startPlayAudioySo12NSDictionaryCAFF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "startPlayAudio:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "stopPlayAudio",
+            "printedName": "stopPlayAudio()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)stopPlayAudio",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC13stopPlayAudioSo12NSDictionaryCyF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "stopPlayAudio",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "feedAudio",
+            "printedName": "feedAudio(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)feedAudio:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC9feedAudioySo12NSDictionaryCAFF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "feedAudio:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "takePhoto",
+            "printedName": "takePhoto()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)takePhoto",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC9takePhotoSo12NSDictionaryCyF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "takePhoto",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "takePhotoWithData",
+            "printedName": "takePhotoWithData(_:completion:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.NSDictionary) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "NSDictionary",
+                    "printedName": "Foundation.NSDictionary",
+                    "usr": "c:objc(cs)NSDictionary"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)takePhotoWithData:completion:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC17takePhotoWithData_10completionySo12NSDictionaryC_yAGctF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "takePhotoWithData:completion:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "queryApp",
+            "printedName": "queryApp(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.NSDictionary) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "NSDictionary",
+                    "printedName": "Foundation.NSDictionary",
+                    "usr": "c:objc(cs)NSDictionary"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)queryApp:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC8queryAppyyySo12NSDictionaryCcF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "queryApp:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "openApp",
+            "printedName": "openApp(_:completion:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.NSDictionary) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "NSDictionary",
+                    "printedName": "Foundation.NSDictionary",
+                    "usr": "c:objc(cs)NSDictionary"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)openApp:completion:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC7openApp_10completionySo12NSDictionaryC_yAGctF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "openApp:completion:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "stopApp",
+            "printedName": "stopApp(_:completion:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.NSDictionary) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "NSDictionary",
+                    "printedName": "Foundation.NSDictionary",
+                    "usr": "c:objc(cs)NSDictionary"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)stopApp:completion:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC7stopApp_10completionySo12NSDictionaryC_yAGctF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "stopApp:completion:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "uninstallApp",
+            "printedName": "uninstallApp(_:completion:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.NSDictionary) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "NSDictionary",
+                    "printedName": "Foundation.NSDictionary",
+                    "usr": "c:objc(cs)NSDictionary"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)uninstallApp:completion:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC12uninstallApp_10completionySo12NSDictionaryC_yAGctF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "uninstallApp:completion:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "installApp",
+            "printedName": "installApp(_:completion:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.NSDictionary) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "NSDictionary",
+                    "printedName": "Foundation.NSDictionary",
+                    "usr": "c:objc(cs)NSDictionary"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)installApp:completion:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC10installApp_10completionySo12NSDictionaryC_yAGctF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "installApp:completion:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "changeAudioSceneId",
+            "printedName": "changeAudioSceneId(_:completion:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              },
+              {
+                "kind": "TypeFunc",
+                "name": "Function",
+                "printedName": "(Foundation.NSDictionary) -> ()",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "Void",
+                    "printedName": "()"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "NSDictionary",
+                    "printedName": "Foundation.NSDictionary",
+                    "usr": "c:objc(cs)NSDictionary"
+                  }
+                ]
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)changeAudioSceneId:completion:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC18changeAudioSceneId_10completionySo12NSDictionaryC_yAGctF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "changeAudioSceneId:completion:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "handleOpenURL",
+            "printedName": "handleOpenURL(_:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Bool",
+                "printedName": "Swift.Bool",
+                "usr": "s:Sb"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "URL",
+                "printedName": "Foundation.URL",
+                "usr": "s:10Foundation3URLV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)handleOpenURL:",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC13handleOpenURLySb10Foundation0G0VF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "handleOpenURL:",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "isInitialized",
+            "printedName": "isInitialized()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)isInitialized",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC13isInitializedSo12NSDictionaryCyF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "isInitialized",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "isAuthenticated",
+            "printedName": "isAuthenticated()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)isAuthenticated",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC15isAuthenticatedSo12NSDictionaryCyF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "isAuthenticated",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "getAuthState",
+            "printedName": "getAuthState()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)getAuthState",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC12getAuthStateSo12NSDictionaryCyF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "getAuthState",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "getCurrentToken",
+            "printedName": "getCurrentToken()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)getCurrentToken",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC15getCurrentTokenSo12NSDictionaryCyF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "getCurrentToken",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "isRokidAppInstalled",
+            "printedName": "isRokidAppInstalled()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "NSDictionary",
+                "printedName": "Foundation.NSDictionary",
+                "usr": "c:objc(cs)NSDictionary"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)isRokidAppInstalled",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC02isA12AppInstalledSo12NSDictionaryCyF",
+            "moduleName": "RokidCXRLUniPlugin",
+            "objc_name": "isRokidAppInstalled",
+            "declAttributes": [
+              "Final",
+              "AccessControl",
+              "ObjC"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "RokidCXRLBridge",
+                "printedName": "RokidCXRLUniPlugin.RokidCXRLBridge",
+                "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge(im)init",
+            "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeCACycfc",
+            "moduleName": "RokidCXRLUniPlugin",
+            "overriding": true,
+            "implicit": true,
+            "objc_name": "init",
+            "declAttributes": [
+              "Dynamic",
+              "ObjC",
+              "Override"
+            ],
+            "init_kind": "Designated"
+          }
+        ],
+        "declKind": "Class",
+        "usr": "c:@M@RokidCXRLUniPlugin@objc(cs)RokidCXRLBridge",
+        "mangledName": "$s18RokidCXRLUniPlugin0A10CXRLBridgeC",
+        "moduleName": "RokidCXRLUniPlugin",
+        "objc_name": "RokidCXRLBridge",
+        "declAttributes": [
+          "Final",
+          "AccessControl",
+          "ObjC"
+        ],
+        "superclassUsr": "c:objc(cs)NSObject",
+        "inheritsConvenienceInitializers": true,
+        "superclassNames": [
+          "ObjectiveC.NSObject"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Copyable",
+            "printedName": "Copyable",
+            "usr": "s:s8CopyableP",
+            "mangledName": "$ss8CopyableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Escapable",
+            "printedName": "Escapable",
+            "usr": "s:s9EscapableP",
+            "mangledName": "$ss9EscapableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Equatable",
+            "printedName": "Equatable",
+            "usr": "s:SQ",
+            "mangledName": "$sSQ"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Hashable",
+            "printedName": "Hashable",
+            "usr": "s:SH",
+            "mangledName": "$sSH"
+          },
+          {
+            "kind": "Conformance",
+            "name": "CVarArg",
+            "printedName": "CVarArg",
+            "usr": "s:s7CVarArgP",
+            "mangledName": "$ss7CVarArgP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "_KeyValueCodingAndObservingPublishing",
+            "printedName": "_KeyValueCodingAndObservingPublishing",
+            "usr": "s:10Foundation37_KeyValueCodingAndObservingPublishingP",
+            "mangledName": "$s10Foundation37_KeyValueCodingAndObservingPublishingP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "_KeyValueCodingAndObserving",
+            "printedName": "_KeyValueCodingAndObserving",
+            "usr": "s:10Foundation27_KeyValueCodingAndObservingP",
+            "mangledName": "$s10Foundation27_KeyValueCodingAndObservingP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "CustomStringConvertible",
+            "printedName": "CustomStringConvertible",
+            "usr": "s:s23CustomStringConvertibleP",
+            "mangledName": "$ss23CustomStringConvertibleP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "CustomDebugStringConvertible",
+            "printedName": "CustomDebugStringConvertible",
+            "usr": "s:s28CustomDebugStringConvertibleP",
+            "mangledName": "$ss28CustomDebugStringConvertibleP"
+          }
+        ]
+      }
+    ],
+    "json_format_version": 8
+  },
+  "ConstValues": [
+    {
+      "filePath": "\/Users\/runner\/work\/rokid-cxrl-uni-plugin\/rokid-cxrl-uni-plugin\/RokidCXRLUniPlugin\/RokidCXRLBridge.swift",
+      "kind": "BooleanLiteral",
+      "offset": 348,
+      "length": 5,
+      "value": "false"
+    },
+    {
+      "filePath": "\/Users\/runner\/work\/rokid-cxrl-uni-plugin\/rokid-cxrl-uni-plugin\/RokidCXRLUniPlugin\/RokidCXRLBridge.swift",
+      "kind": "BooleanLiteral",
+      "offset": 384,
+      "length": 5,
+      "value": "false"
+    },
+    {
+      "filePath": "\/Users\/runner\/work\/rokid-cxrl-uni-plugin\/rokid-cxrl-uni-plugin\/RokidCXRLUniPlugin\/RokidCXRLBridge.swift",
+      "kind": "Dictionary",
+      "offset": 20269,
+      "length": 3,
+      "value": "[]"
+    }
+  ]
+}
