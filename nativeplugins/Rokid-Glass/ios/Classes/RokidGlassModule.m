@@ -1,7 +1,13 @@
 #import "RokidGlassModule.h"
 #import "DCUniConvert.h"
 
-#if __has_include("RokidGlass-Swift.h")
+#if __has_include("RokidCXRLUniPlugin-Swift.h")
+#import "RokidCXRLUniPlugin-Swift.h"
+#define ROKID_GLASS_SWIFT_HEADER_AVAILABLE 1
+#elif __has_include(<RokidCXRLUniPlugin/RokidCXRLUniPlugin-Swift.h>)
+#import <RokidCXRLUniPlugin/RokidCXRLUniPlugin-Swift.h>
+#define ROKID_GLASS_SWIFT_HEADER_AVAILABLE 1
+#elif __has_include("RokidGlass-Swift.h")
 #import "RokidGlass-Swift.h"
 #define ROKID_GLASS_SWIFT_HEADER_AVAILABLE 1
 #elif __has_include("Rokid_Glass-Swift.h")
@@ -41,13 +47,13 @@
 - (void)getState:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)releaseSession:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 @end
+#endif
 
 @interface RokidCXRLModule : RokidGlassModule
 @end
 
 @implementation RokidCXRLModule
 @end
-#endif
 
 @interface RokidGlassModule ()
 @property (nonatomic, strong) RokidGlassBridge *bridge;

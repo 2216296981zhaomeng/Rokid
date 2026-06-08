@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 
+@objc(RokidGlassPluginProxy)
 @objcMembers
 public class RokidGlassPluginProxy: NSObject {
     public func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
@@ -16,5 +17,6 @@ public class RokidGlassPluginProxy: NSObject {
     }
 }
 
+@objc(RokidCXRLPluginProxy)
 @objcMembers
 public final class RokidCXRLPluginProxy: RokidGlassPluginProxy {}

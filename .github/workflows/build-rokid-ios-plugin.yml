@@ -2,6 +2,13 @@ name: Build Rokid iOS Plugin
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - ".github/workflows/build-rokid-ios-plugin.yml"
+      - "nativeplugins/Rokid-Glass/**"
 
 jobs:
   build:

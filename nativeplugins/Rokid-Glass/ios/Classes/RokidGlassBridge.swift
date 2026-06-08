@@ -6,6 +6,7 @@ import RGCxrClient
 
 public typealias RokidGlassCallback = (_ result: Any?, _ keepAlive: Bool) -> Void
 
+@objc(RokidGlassBridge)
 @objcMembers
 public final class RokidGlassBridge: NSObject {
     public static let shared = RokidGlassBridge()
