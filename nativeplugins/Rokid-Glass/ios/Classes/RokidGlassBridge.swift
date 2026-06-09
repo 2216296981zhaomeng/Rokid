@@ -15,16 +15,22 @@ public final class RokidGlassBridge: NSObject {
     private static var initializedSessionType = "customView"
 
     private let client: RGCxrClient = CxrClient.shared
-    private let bridgeVersion = "ios-cxrl-1.0.5-native-upload-20260608"
+    private let bridgeVersion = "ios-cxrl-1.0.6-auth-callback-20260609"
     private var cancellables = Set<AnyCancellable>()
     private var eventCallback: RokidGlassCallback?
     private var pendingPhotoCallback: RokidGlassCallback?
+    private var pendingAuthorizationCallback: RokidGlassCallback?
+    private var authorizationRequestId: Int64 = 0
+    private var completedAuthorizationRequestId: Int64 = 0
 
     private var token = ""
     private var sessionId = ""
     private var deviceName = ""
     private var sessionType = "customView"
     private var packageName = "com.rokid.cxrswithcxrl"
+    private var appDisplayName = "宅喔经纪人"
+    private var iosBundleId = "com.tcwang.agent"
+    private var iosPageName = "com.tcwang.agent"
     private var sceneReady = false
     private var audioStarted = false
     private var audioCodecType = -1
@@ -76,13 +82,15 @@ public final class RokidGlassBridge: NSObject {
     }
 
     public func initSDK(_ options: NSDictionary?, callback: RokidGlassCallback?) {
-        let nextType = stringOption(options, "sessionType", sessionType)
+        let nextType = stringOption(options, "sessionType", stringOption(options, "mode", sessionType))
         sessionType = nextType == "customApp" ? "customApp" : "customView"
-        packageName = stringOption(options, "packageName", packageName)
-        initializeIfNeeded(sessionType)
+        applyIdentity(options)
+        initializeIfNeeded(sessionType, options: options)
         invoke(callback, ok(stateJson().merging([
             "rokidAIAppInstalled": client.isRokidAppInstalled(),
-            "iosInitializedSessionType": Self.initializedSessionType
+            "iosInitializedSessionType": Self.initializedSessionType,
+            "iosBundleId": iosBundleId,
+            "iosPageName": iosPageName
         ]) { _, new in new }))
     }
 
@@ -93,57 +101,70 @@ public final class RokidGlassBridge: NSObject {
     }
 
     public func requestAuthorization(_ options: NSDictionary?, callback: RokidGlassCallback?) {
-        initializeIfNeeded(sessionType)
+        applyIdentity(options)
+        initializeIfNeeded(sessionType, options: options)
         guard client.isRokidAppInstalled() else {
             invoke(callback, error(1002, "Rokid AI App is not installed"))
             return
         }
 
-        let appName = stringOption(options, "appName", "宅喔经纪人")
+        if client.auth.isAuthenticated() {
+            token = client.auth.currentToken ?? token
+            sessionId = client.auth.currentSessionId ?? sessionId
+            deviceName = client.auth.currentDeviceName ?? currentDeviceName()
+            invoke(callback, ok(authorizationPayload()))
+            return
+        }
+
+        authorizationRequestId += 1
+        let requestId = authorizationRequestId
+        completedAuthorizationRequestId = 0
+        pendingAuthorizationCallback = callback
+
+        let appName = stringOption(options, "appName", appDisplayName)
+        let requestBundleId = stringOption(options, "bundleId", stringOption(options, "iosBundleId", iosBundleId))
+        let scopes = stringArrayOption(options, "scopes", ["device_control", "audio_stream"])
+        let nativeTimeout = max(15, intOption(options, "nativeAuthTimeout", 75))
         client.auth.authenticate(
-            scopes: ["device_control", "audio_stream"],
+            scopes: scopes,
+            bundleId: requestBundleId.isEmpty ? nil : requestBundleId,
             appName: appName
         ) { [weak self] result in
             guard let self = self else { return }
             DispatchQueue.main.async {
                 switch result {
                 case .success(let auth):
-                    self.token = auth.0
-                    self.sessionId = auth.1 ?? ""
-                    self.deviceName = self.currentDeviceName()
-                    self.emit("authorization", self.stateJson())
-                    self.invoke(callback, self.ok(self.stateJson().merging([
-                        "token": self.token,
-                        "sessionId": self.sessionId,
-                        "deviceName": self.deviceName
-                    ]) { _, new in new }))
+                    self.completeAuthorizationSuccess(requestId, token: auth.0, sessionId: auth.1, deviceName: self.currentDeviceName())
                 case .failure(let authError):
-                    self.emit("authorization", self.stateJson().merging([
-                        "message": authError.localizedDescription
-                    ]) { _, new in new })
-                    self.invoke(callback, self.error(1002, authError.localizedDescription))
+                    self.completeAuthorizationFailure(requestId, message: authError.localizedDescription)
                 }
             }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + TimeInterval(nativeTimeout)) { [weak self] in
+            self?.completeAuthorizationFailure(requestId, message: "Rokid authorization callback timeout after \(nativeTimeout)s")
         }
     }
 
     public func connectCustomView(_ options: NSDictionary?, callback: RokidGlassCallback?) {
         sessionType = "customView"
-        initializeIfNeeded(sessionType)
+        applyIdentity(options)
+        initializeIfNeeded(sessionType, options: options)
         invoke(callback, ok(stateJson()))
     }
 
     public func connectCustomApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
         sessionType = "customApp"
-        packageName = stringOption(options, "packageName", packageName)
-        initializeIfNeeded(sessionType)
+        applyIdentity(options)
+        initializeIfNeeded(sessionType, options: options)
         invoke(callback, ok(stateJson()))
     }
 
     public func openCustomView(_ options: NSDictionary?, callback: RokidGlassCallback?) {
         guard ensureAuthenticated(callback) else { return }
         sessionType = "customView"
-        initializeIfNeeded(sessionType)
+        applyIdentity(options)
+        initializeIfNeeded(sessionType, options: options)
         let viewJson = stringOption(options, "viewJson", defaultCustomViewJson(
             title: stringOption(options, "title", "宅喔带看"),
             text: stringOption(options, "text", "眼镜端场景已打开")
@@ -188,7 +209,8 @@ public final class RokidGlassBridge: NSObject {
     public func openApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
         guard ensureAuthenticated(callback) else { return }
         sessionType = "customApp"
-        initializeIfNeeded(sessionType)
+        applyIdentity(options)
+        initializeIfNeeded(sessionType, options: options)
         let entry = stringOption(options, "entry", packageName + ".activities.main.MainActivity")
         let url = stringOption(options, "url", "")
         client.openApp(activityName: entry, url: url) { [weak self] success in
@@ -247,7 +269,8 @@ public final class RokidGlassBridge: NSObject {
 
     public func startAudioRecord(_ options: NSDictionary?, callback: RokidGlassCallback?) {
         guard ensureAuthenticated(callback) else { return }
-        initializeIfNeeded(sessionType)
+        applyIdentity(options)
+        initializeIfNeeded(sessionType, options: options)
         audioType = stringOption(options, "iosRecordType", stringOption(options, "recordType", stringOption(options, "type", "test")))
         audioCodecType = intOption(options, "codecType", 1)
         let useNativeUpload = boolOption(options, "nativeUpload", false)
@@ -389,7 +412,11 @@ public final class RokidGlassBridge: NSObject {
     }
 
     public static func handleOpenURL(_ url: URL) -> Bool {
-        return CxrClient.shared.handleOpenURL(url)
+        let client = CxrClient.shared
+        if client.handleOpenURL(url) {
+            return true
+        }
+        return client.auth.handleCallback(url: url)
     }
 
     public static func bootstrapDefault() {
@@ -468,38 +495,104 @@ public final class RokidGlassBridge: NSObject {
     private func handleAuthEvent(_ event: RGCxrClientAuthEvent) {
         switch event {
         case .authenticationSucceeded(let nextToken, let nextSessionId, let deviceName):
-            token = nextToken
-            sessionId = nextSessionId ?? ""
-            self.deviceName = deviceName ?? currentDeviceName()
-            emit("authorization", stateJson().merging([
-                "token": token,
-                "sessionId": sessionId,
-                "deviceName": self.deviceName
-            ]) { _, new in new })
+            if pendingAuthorizationCallback != nil {
+                completeAuthorizationSuccess(authorizationRequestId, token: nextToken, sessionId: nextSessionId, deviceName: deviceName)
+            } else {
+                token = nextToken
+                sessionId = nextSessionId ?? ""
+                self.deviceName = deviceName ?? currentDeviceName()
+                emit("authorization", authorizationPayload())
+            }
         case .authenticationFailed(let authError):
-            emit("authorization", stateJson().merging([
-                "message": "\(authError)"
-            ]) { _, new in new })
+            if pendingAuthorizationCallback != nil {
+                completeAuthorizationFailure(authorizationRequestId, message: "\(authError)")
+            } else {
+                emit("authorization", stateJson().merging([
+                    "message": "\(authError)"
+                ]) { _, new in new })
+            }
         case .tokenExpired:
             token = ""
             emit("authorization", stateJson().merging(["message": "tokenExpired"]) { _, new in new })
-        case .stateChanged:
-            emit("authorizationState", stateJson())
+        case .stateChanged(let authState):
+            if authState.isAuthenticated, pendingAuthorizationCallback != nil {
+                completeAuthorizationSuccess(
+                    authorizationRequestId,
+                    token: client.auth.currentToken ?? token,
+                    sessionId: client.auth.currentSessionId,
+                    deviceName: client.auth.currentDeviceName
+                )
+            } else {
+                emit("authorizationState", stateJson())
+            }
         }
     }
 
-    private func initializeIfNeeded(_ nextType: String) {
+    private func initializeIfNeeded(_ nextType: String, options: NSDictionary?) {
         if Self.initialized {
+            configureAuth(options)
             return
         }
         if nextType == "customApp" {
-            CxrClient.initialize(mode: .customApp, options: .init(appDisplayName: "宅喔经纪人", pageName: packageName))
+            CxrClient.initialize(mode: .customApp, options: .init(appDisplayName: appDisplayName, pageName: packageName))
             Self.initializedSessionType = "customApp"
         } else {
             CxrClient.initialize(mode: .customView, options: .init(appDisplayName: nil, pageName: nil))
             Self.initializedSessionType = "customView"
         }
         Self.initialized = true
+        configureAuth(options)
+    }
+
+    private func applyIdentity(_ options: NSDictionary?) {
+        appDisplayName = stringOption(options, "appDisplayName", stringOption(options, "appName", appDisplayName))
+        iosBundleId = stringOption(options, "bundleId", stringOption(options, "iosBundleId", iosBundleId))
+        iosPageName = stringOption(options, "pageName", stringOption(options, "iosPageName", iosPageName.isEmpty ? iosBundleId : iosPageName))
+        packageName = stringOption(options, "packageName", packageName)
+    }
+
+    private func configureAuth(_ options: NSDictionary?) {
+        var config = client.auth.config
+        config.callbackScheme = stringOption(options, "callbackScheme", config.callbackScheme)
+        config.callbackHost = stringOption(options, "callbackHost", config.callbackHost)
+        config.callbackPath = stringOption(options, "callbackPath", config.callbackPath)
+        config.requestTimeout = TimeInterval(max(60, intOption(options, "sdkAuthTimeout", Int(config.requestTimeout))))
+        client.auth.config = config
+    }
+
+    private func authorizationPayload() -> [String: Any] {
+        return stateJson().merging([
+            "token": token,
+            "sessionId": sessionId,
+            "deviceName": deviceName,
+            "authenticated": client.auth.isAuthenticated() || !token.isEmpty,
+            "iosBundleId": iosBundleId,
+            "iosPageName": iosPageName
+        ]) { _, new in new }
+    }
+
+    private func completeAuthorizationSuccess(_ requestId: Int64, token nextToken: String, sessionId nextSessionId: String?, deviceName nextDeviceName: String?) {
+        guard requestId == authorizationRequestId, completedAuthorizationRequestId != requestId else { return }
+        completedAuthorizationRequestId = requestId
+        token = nextToken
+        sessionId = nextSessionId ?? ""
+        deviceName = nextDeviceName ?? currentDeviceName()
+        let callback = pendingAuthorizationCallback
+        pendingAuthorizationCallback = nil
+        let payload = authorizationPayload()
+        emit("authorization", payload)
+        invoke(callback, ok(payload))
+    }
+
+    private func completeAuthorizationFailure(_ requestId: Int64, message: String) {
+        guard requestId == authorizationRequestId, completedAuthorizationRequestId != requestId else { return }
+        completedAuthorizationRequestId = requestId
+        let callback = pendingAuthorizationCallback
+        pendingAuthorizationCallback = nil
+        emit("authorization", stateJson().merging([
+            "message": message
+        ]) { _, new in new })
+        invoke(callback, error(1002, message))
     }
 
     private func ensureAuthenticated(_ callback: RokidGlassCallback?) -> Bool {
@@ -918,6 +1011,25 @@ public final class RokidGlassBridge: NSObject {
         return defaultValue
     }
 
+    private func stringArrayOption(_ options: NSDictionary?, _ key: String, _ defaultValue: [String]) -> [String] {
+        guard let value = options?[key] else { return defaultValue }
+        if let array = value as? [String] {
+            return array.filter { !$0.isEmpty }
+        }
+        if let array = value as? NSArray {
+            let mapped = array.compactMap { item -> String? in
+                if let string = item as? String, !string.isEmpty { return string }
+                return nil
+            }
+            return mapped.isEmpty ? defaultValue : mapped
+        }
+        if let string = value as? String {
+            let mapped = string.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+            return mapped.isEmpty ? defaultValue : mapped
+        }
+        return defaultValue
+    }
+
     private func stateJson() -> [String: Any] {
         let currentSessionId = sessionId.isEmpty ? (client.auth.currentSessionId ?? "") : sessionId
         let currentName = currentDeviceName()
@@ -938,6 +1050,8 @@ public final class RokidGlassBridge: NSObject {
             "pcmPath": pcmPath,
             "path": wavPath,
             "bridgeVersion": bridgeVersion,
+            "iosBundleId": iosBundleId,
+            "iosPageName": iosPageName,
             "nativeUpload": nativeAudioUploadEnabled,
             "nativeUploadState": nativeAudioUploadState,
             "nativeUploadError": nativeAudioUploadError,

@@ -12,7 +12,18 @@ public class RokidGlassPluginProxy: NSObject {
         return RokidGlassBridge.handleOpenURL(url)
     }
 
+    public func application(_ application: UIApplication, open url: URL, sourceApplication: String?, annotation: Any) -> Bool {
+        return RokidGlassBridge.handleOpenURL(url)
+    }
+
     public func application(_ application: UIApplication, handleOpen url: URL) -> Bool {
+        return RokidGlassBridge.handleOpenURL(url)
+    }
+
+    public func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([Any]?) -> Void) -> Bool {
+        guard userActivity.activityType == NSUserActivityTypeBrowsingWeb, let url = userActivity.webpageURL else {
+            return false
+        }
         return RokidGlassBridge.handleOpenURL(url)
     }
 }
