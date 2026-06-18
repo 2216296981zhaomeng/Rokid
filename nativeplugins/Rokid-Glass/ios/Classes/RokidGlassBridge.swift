@@ -12,10 +12,10 @@ public final class RokidGlassBridge: NSObject {
     public static let shared = RokidGlassBridge()
 
     private static var initialized = false
-    private static var initializedSessionType = "customView"
+    private static var initializedSessionType = "customApp"
 
     private let client: RGCxrClient = CxrClient.shared
-    private let bridgeVersion = "ios-cxrl-1.0.8-customview-fallback-20260618"
+    private let bridgeVersion = "ios-cxrl-1.0.10-customapp-audio-20260618"
     private var cancellables = Set<AnyCancellable>()
     private var eventCallback: RokidGlassCallback?
     private var pendingAuthorizationCallback: RokidGlassCallback?
@@ -25,8 +25,9 @@ public final class RokidGlassBridge: NSObject {
     private var token = ""
     private var sessionId = ""
     private var deviceName = ""
-    private var sessionType = "customView"
+    private var sessionType = "customApp"
     private var packageName = "com.rokid.cxrswithcxrl"
+    private var appActivityName = "com.rokid.cxrswithcxrl.activities.main.MainActivity"
     private var appDisplayName = "宅喔经纪人"
     private var iosBundleId = "com.tcwang.agent"
     private var iosPageName = "com.tcwang.agent"
@@ -158,6 +159,13 @@ public final class RokidGlassBridge: NSObject {
         invoke(callback, ok(stateJson()))
     }
 
+    public func connectCustomApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        sessionType = "customApp"
+        applyIdentity(options)
+        initializeIfNeeded(sessionType, options: options)
+        invoke(callback, ok(stateJson()))
+    }
+
     public func openCustomView(_ options: NSDictionary?, callback: RokidGlassCallback?) {
         guard ensureAuthenticated(callback) else { return }
         sessionType = "customView"
@@ -226,6 +234,59 @@ public final class RokidGlassBridge: NSObject {
         }
     }
 
+    public func queryApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        guard ensureAuthenticated(callback) else { return }
+        applyIdentity(options)
+        initializeIfNeeded("customApp", options: options)
+        client.queryApp { [weak self] success in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                let payload = self.stateJson().merging([
+                    "success": success,
+                    "appInstalled": success
+                ]) { _, new in new }
+                self.emit("queryApp", payload)
+                self.invoke(callback, self.ok(payload))
+            }
+        }
+    }
+
+    public func openApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        guard ensureAuthenticated(callback) else { return }
+        sessionType = "customApp"
+        applyIdentity(options)
+        initializeIfNeeded(sessionType, options: options)
+        let activityName = stringOption(options, "activityName", stringOption(options, "entry", appActivityName))
+        let url = stringOption(options, "url", "")
+        client.openApp(activityName: activityName, url: url) { [weak self] success in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.sceneReady = success
+                let payload = self.stateJson().merging([
+                    "success": success,
+                    "activityName": activityName,
+                    "url": url
+                ]) { _, new in new }
+                self.emit(success ? "customAppOpened" : "customAppOpenFailed", payload)
+                self.invoke(callback, success ? self.ok(payload) : self.error(1003, "openApp failed"))
+            }
+        }
+    }
+
+    public func stopApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        client.stopApp { [weak self] success in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                if success { self.sceneReady = false }
+                let payload = self.stateJson().merging([
+                    "success": success
+                ]) { _, new in new }
+                self.emit("customAppClosed", payload)
+                self.invoke(callback, success ? self.ok(payload) : self.error(1003, "stopApp failed"))
+            }
+        }
+    }
+
     public func changeAudioSceneId(_ options: NSDictionary?, callback: RokidGlassCallback?) {
         let scene = audioSceneOption(options, defaultValue: .conference)
         audioSceneId = scene.rawValue
@@ -245,6 +306,10 @@ public final class RokidGlassBridge: NSObject {
 
     public func startAudioRecord(_ options: NSDictionary?, callback: RokidGlassCallback?) {
         guard ensureAuthenticated(callback) else { return }
+        let nextType = stringOption(options, "sessionType", stringOption(options, "mode", sessionType))
+        if nextType == "customApp" {
+            sessionType = "customApp"
+        }
         applyIdentity(options)
         initializeIfNeeded(sessionType, options: options)
         audioType = stringOption(options, "iosRecordType", stringOption(options, "recordType", stringOption(options, "type", "test")))
@@ -305,6 +370,7 @@ public final class RokidGlassBridge: NSObject {
             "sampleRate": sampleRate,
             "channels": channels,
             "bitsPerSample": bitsPerSample,
+            "recordType": audioType,
             "nativeUpload": useNativeUpload
         ]) { _, new in new }))
     }
@@ -375,9 +441,9 @@ public final class RokidGlassBridge: NSObject {
 
     public static func bootstrapDefault() {
         guard !initialized else { return }
-        CxrClient.initialize(mode: .customView, options: .init(appDisplayName: "宅喔经纪人", pageName: nil))
+        CxrClient.initialize(mode: .customApp, options: .init(appDisplayName: "宅喔经纪人", pageName: "com.rokid.cxrswithcxrl"))
         initialized = true
-        initializedSessionType = "customView"
+        initializedSessionType = "customApp"
     }
 
     private func bindEvents() {
@@ -508,6 +574,7 @@ public final class RokidGlassBridge: NSObject {
         iosBundleId = stringOption(options, "bundleId", stringOption(options, "iosBundleId", iosBundleId))
         iosPageName = stringOption(options, "pageName", stringOption(options, "iosPageName", iosPageName.isEmpty ? iosBundleId : iosPageName))
         packageName = stringOption(options, "packageName", packageName)
+        appActivityName = stringOption(options, "activityName", stringOption(options, "entry", appActivityName))
     }
 
     private func configureAuth(_ options: NSDictionary?) {

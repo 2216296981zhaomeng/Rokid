@@ -26,9 +26,13 @@
 - (void)checkPermissions:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)requestAuthorization:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)connectCustomView:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
+- (void)connectCustomApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)openCustomView:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)updateCustomView:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)closeCustomView:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
+- (void)queryApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
+- (void)openApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
+- (void)stopApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)changeAudioSceneId:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)startAudioRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)stopAudioRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
@@ -58,9 +62,13 @@ UNI_EXPORT_METHOD(@selector(initSDK:callback:))
 UNI_EXPORT_METHOD(@selector(checkPermissions:callback:))
 UNI_EXPORT_METHOD(@selector(requestAuthorization:callback:))
 UNI_EXPORT_METHOD(@selector(connectCustomView:callback:))
+UNI_EXPORT_METHOD(@selector(connectCustomApp:callback:))
 UNI_EXPORT_METHOD(@selector(openCustomView:callback:))
 UNI_EXPORT_METHOD(@selector(updateCustomView:callback:))
 UNI_EXPORT_METHOD(@selector(closeCustomView:callback:))
+UNI_EXPORT_METHOD(@selector(queryApp:callback:))
+UNI_EXPORT_METHOD(@selector(openApp:callback:))
+UNI_EXPORT_METHOD(@selector(stopApp:callback:))
 UNI_EXPORT_METHOD(@selector(changeAudioSceneId:callback:))
 UNI_EXPORT_METHOD(@selector(startAudioRecord:callback:))
 UNI_EXPORT_METHOD(@selector(stopAudioRecord:callback:))
@@ -100,6 +108,10 @@ UNI_EXPORT_METHOD(@selector(release:callback:))
     [self.bridge connectCustomView:options callback:callback];
 }
 
+- (void)connectCustomApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
+    [self.bridge connectCustomApp:options callback:callback];
+}
+
 - (void)openCustomView:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
     [self.bridge openCustomView:options callback:callback];
 }
@@ -110,6 +122,18 @@ UNI_EXPORT_METHOD(@selector(release:callback:))
 
 - (void)closeCustomView:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
     [self.bridge closeCustomView:options callback:callback];
+}
+
+- (void)queryApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
+    [self.bridge queryApp:options callback:callback];
+}
+
+- (void)openApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
+    [self.bridge openApp:options callback:callback];
+}
+
+- (void)stopApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
+    [self.bridge stopApp:options callback:callback];
 }
 
 - (void)changeAudioSceneId:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
