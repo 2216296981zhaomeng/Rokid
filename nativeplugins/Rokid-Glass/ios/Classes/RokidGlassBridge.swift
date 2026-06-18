@@ -12,10 +12,10 @@ public final class RokidGlassBridge: NSObject {
     public static let shared = RokidGlassBridge()
 
     private static var initialized = false
-    private static var initializedSessionType = "customApp"
+    private static var initializedSessionType = "customView"
 
     private let client: RGCxrClient = CxrClient.shared
-    private let bridgeVersion = "ios-cxrl-1.0.10-customapp-audio-20260618"
+    private let bridgeVersion = "ios-cxrl-1.0.11-customview-teleprompter-20260618"
     private var cancellables = Set<AnyCancellable>()
     private var eventCallback: RokidGlassCallback?
     private var pendingAuthorizationCallback: RokidGlassCallback?
@@ -25,7 +25,7 @@ public final class RokidGlassBridge: NSObject {
     private var token = ""
     private var sessionId = ""
     private var deviceName = ""
-    private var sessionType = "customApp"
+    private var sessionType = "customView"
     private var packageName = "com.rokid.cxrswithcxrl"
     private var appActivityName = "com.rokid.cxrswithcxrl.activities.main.MainActivity"
     private var appDisplayName = "宅喔经纪人"
@@ -441,9 +441,9 @@ public final class RokidGlassBridge: NSObject {
 
     public static func bootstrapDefault() {
         guard !initialized else { return }
-        CxrClient.initialize(mode: .customApp, options: .init(appDisplayName: "宅喔经纪人", pageName: "com.rokid.cxrswithcxrl"))
+        CxrClient.initialize(mode: .customView, options: .init(appDisplayName: "宅喔经纪人", pageName: nil))
         initialized = true
-        initializedSessionType = "customApp"
+        initializedSessionType = "customView"
     }
 
     private func bindEvents() {

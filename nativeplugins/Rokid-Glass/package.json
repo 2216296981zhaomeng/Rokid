@@ -1,7 +1,7 @@
 {
   "name": "Rokid-Glass",
   "id": "Rokid-Glass",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "Rokid CXR-L native plugin for authorization, sessions, custom view setup, and audio streaming.",
   "_dp_type": "nativeplugin",
   "_dp_nativeplugin": {
