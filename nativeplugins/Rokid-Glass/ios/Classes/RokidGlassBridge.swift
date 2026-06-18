@@ -18,7 +18,6 @@ public final class RokidGlassBridge: NSObject {
     private let bridgeVersion = "ios-cxrl-1.0.6-auth-callback-20260609"
     private var cancellables = Set<AnyCancellable>()
     private var eventCallback: RokidGlassCallback?
-    private var pendingPhotoCallback: RokidGlassCallback?
     private var pendingAuthorizationCallback: RokidGlassCallback?
     private var authorizationRequestId: Int64 = 0
     private var completedAuthorizationRequestId: Int64 = 0
@@ -34,7 +33,6 @@ public final class RokidGlassBridge: NSObject {
     private var sceneReady = false
     private var audioStarted = false
     private var audioCodecType = -1
-    private var photoTaking = false
     private var audioType = "agent"
 
     private let audioQueue = DispatchQueue(label: "com.zhaiwo.agent.rokid.ios.audio")
@@ -153,13 +151,6 @@ public final class RokidGlassBridge: NSObject {
         invoke(callback, ok(stateJson()))
     }
 
-    public func connectCustomApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
-        sessionType = "customApp"
-        applyIdentity(options)
-        initializeIfNeeded(sessionType, options: options)
-        invoke(callback, ok(stateJson()))
-    }
-
     public func openCustomView(_ options: NSDictionary?, callback: RokidGlassCallback?) {
         guard ensureAuthenticated(callback) else { return }
         sessionType = "customView"
@@ -202,67 +193,6 @@ public final class RokidGlassBridge: NSObject {
                 if success { self.sceneReady = false }
                 self.emit("customViewClosed", self.stateJson())
                 self.invoke(callback, success ? self.ok(self.stateJson()) : self.error(1003, "closeCustomView failed"))
-            }
-        }
-    }
-
-    public func openApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
-        guard ensureAuthenticated(callback) else { return }
-        sessionType = "customApp"
-        applyIdentity(options)
-        initializeIfNeeded(sessionType, options: options)
-        let entry = stringOption(options, "entry", packageName + ".activities.main.MainActivity")
-        let url = stringOption(options, "url", "")
-        client.openApp(activityName: entry, url: url) { [weak self] success in
-            guard let self = self else { return }
-            DispatchQueue.main.async {
-                self.sceneReady = success
-                self.emit("appOpenResult", self.stateJson().merging(["success": success]) { _, new in new })
-                self.invoke(callback, success ? self.ok(self.stateJson()) : self.error(1003, "openApp failed"))
-            }
-        }
-    }
-
-    public func stopApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
-        client.stopApp { [weak self] success in
-            guard let self = self else { return }
-            DispatchQueue.main.async {
-                if success { self.sceneReady = false }
-                self.emit("appStopResult", self.stateJson().merging(["success": success]) { _, new in new })
-                self.invoke(callback, self.ok(self.stateJson()))
-            }
-        }
-    }
-
-    public func queryApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
-        client.queryApp { [weak self] installed in
-            guard let self = self else { return }
-            DispatchQueue.main.async {
-                self.emit("appQueryResult", self.stateJson().merging(["installed": installed]) { _, new in new })
-                self.invoke(callback, self.ok(self.stateJson().merging(["installed": installed]) { _, new in new }))
-            }
-        }
-    }
-
-    public func installApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
-        let path = stringOption(options, "apkPath", stringOption(options, "path", ""))
-        guard !path.isEmpty else {
-            invoke(callback, error(1004, "apkPath is required"))
-            return
-        }
-        client.installApp(path) { [weak self] success in
-            guard let self = self else { return }
-            DispatchQueue.main.async {
-                self.invoke(callback, success ? self.ok(self.stateJson()) : self.error(1003, "installApp failed"))
-            }
-        }
-    }
-
-    public func uninstallApp(_ options: NSDictionary?, callback: RokidGlassCallback?) {
-        client.uninstallApp { [weak self] success in
-            guard let self = self else { return }
-            DispatchQueue.main.async {
-                self.invoke(callback, success ? self.ok(self.stateJson()) : self.error(1003, "uninstallApp failed"))
             }
         }
     }
@@ -325,58 +255,6 @@ public final class RokidGlassBridge: NSObject {
         invoke(callback, ok(data))
     }
 
-    public func takePhoto(_ options: NSDictionary?, callback: RokidGlassCallback?) {
-        guard ensureAuthenticated(callback) else { return }
-        guard sceneReady else {
-            invoke(callback, error(1004, "Glasses scene is not ready. Open customView or customApp first."))
-            return
-        }
-        if photoTaking {
-            invoke(callback, error(1004, "A photo request is already running"))
-            return
-        }
-        photoTaking = true
-        pendingPhotoCallback = callback
-        let width = intOption(options, "width", 1024)
-        let height = intOption(options, "height", 768)
-        let quality = intOption(options, "quality", 80)
-        client.takePhotoWithData(width: width, height: height, quality: quality) { [weak self] data in
-            guard let self = self else { return }
-            DispatchQueue.main.async {
-                self.photoTaking = false
-                do {
-                    let path = try self.savePhoto(data)
-                    let payload = self.stateJson().merging([
-                        "path": path,
-                        "size": data.count
-                    ]) { _, new in new }
-                    self.emit("photoReceived", payload)
-                    self.invoke(self.pendingPhotoCallback, self.ok(payload))
-                } catch {
-                    self.emit("photoError", self.stateJson().merging(["message": error.localizedDescription]) { _, new in new })
-                    self.invoke(self.pendingPhotoCallback, self.error(1005, error.localizedDescription))
-                }
-                self.pendingPhotoCallback = nil
-            }
-        }
-    }
-
-    public func sendCustomCommand(_ options: NSDictionary?, callback: RokidGlassCallback?) {
-        guard ensureAuthenticated(callback) else { return }
-        let key = stringOption(options, "key", "rk_custom_client")
-        let payload = commandPayload(options)
-        client.sendCustomCmd(cmd: key, payload: payload)
-        invoke(callback, ok(stateJson().merging(["key": key]) { _, new in new }))
-    }
-
-    public func startVideoRecord(_ options: NSDictionary?, callback: RokidGlassCallback?) {
-        sendVideoCommand(options, callback: callback, command: "startVideoRecord")
-    }
-
-    public func stopVideoRecord(_ options: NSDictionary?, callback: RokidGlassCallback?) {
-        sendVideoCommand(options, callback: callback, command: "stopVideoRecord")
-    }
-
     public func isBluetoothConnected(_ options: NSDictionary?, callback: RokidGlassCallback?) {
         invoke(callback, ok(stateJson().merging(["connected": client.auth.isAuthenticated()]) { _, new in new }))
     }
@@ -412,11 +290,25 @@ public final class RokidGlassBridge: NSObject {
     }
 
     public static func handleOpenURL(_ url: URL) -> Bool {
+        bootstrapDefault()
         let client = CxrClient.shared
         if client.handleOpenURL(url) {
             return true
         }
         return client.auth.handleCallback(url: url)
+    }
+
+    public func handleOpenURL(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        let urlString = stringOption(options, "url", "")
+        guard !urlString.isEmpty, let url = URL(string: urlString) else {
+            invoke(callback, error(1001, "Invalid callback url"))
+            return
+        }
+        let handled = Self.handleOpenURL(url)
+        invoke(callback, ok(stateJson().merging([
+            "handled": handled,
+            "url": urlString
+        ]) { _, new in new }))
     }
 
     public static func bootstrapDefault() {
@@ -601,15 +493,6 @@ public final class RokidGlassBridge: NSObject {
         }
         invoke(callback, error(1002, "Rokid authorization is required"))
         return false
-    }
-
-    private func sendVideoCommand(_ options: NSDictionary?, callback: RokidGlassCallback?, command: String) {
-        let payloadOptions = NSMutableDictionary(dictionary: options ?? [:])
-        payloadOptions["command"] = stringOption(options, "command", command)
-        if payloadOptions["params"] == nil {
-            payloadOptions["params"] = ["source": "agent-app-ios"]
-        }
-        sendCustomCommand(payloadOptions, callback: callback)
     }
 
     private func handleAudioData(_ data: Data, timestamp: UInt64) {
@@ -849,12 +732,6 @@ public final class RokidGlassBridge: NSObject {
         return url
     }
 
-    private func savePhoto(_ data: Data) throws -> String {
-        let path = mediaDirectory().appendingPathComponent("photo_\(fileTimestamp()).jpg").path
-        try data.write(to: URL(fileURLWithPath: path), options: .atomic)
-        return path
-    }
-
     private func mediaDirectory() -> URL {
         let root = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let dir = root.appendingPathComponent("RokidGlass", isDirectory: true)
@@ -1059,7 +936,6 @@ public final class RokidGlassBridge: NSObject {
             "nativeUploadDroppedBytes": nativeAudioDroppedBytes,
             "nativeUploadSentBytes": nativeAudioSentBytes,
             "nativeUploadSentChunks": nativeAudioSentChunks,
-            "photoTaking": photoTaking,
             "glassId": glassId,
             "glassIdSource": glassId.isEmpty ? "unavailable" : "connectedDeviceName",
             "glassIdStable": false,

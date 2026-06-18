@@ -2,31 +2,22 @@ name: Build Rokid iOS Plugin
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
-    paths:
-      - ".github/workflows/build-rokid-ios-plugin.yml"
-      - "nativeplugins/Rokid-Glass/**"
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Show Xcode
+      - name: Build Rokid iOS framework
         run: |
-          xcodebuild -version
-          xcrun swiftc --version
-
-      - name: Build iOS framework
-        run: bash nativeplugins/Rokid-Glass/tools/ios/build_ios_uni_plugin_framework.sh
+          chmod +x nativeplugins/Rokid-Glass/tools/ios/build_ios_uni_plugin_framework.sh
+          nativeplugins/Rokid-Glass/tools/ios/build_ios_uni_plugin_framework.sh
 
       - name: Package native plugin
-        run: bash nativeplugins/Rokid-Glass/tools/ios/package_ios_native_plugin.sh
+        run: |
+          chmod +x nativeplugins/Rokid-Glass/tools/ios/package_ios_native_plugin.sh
+          nativeplugins/Rokid-Glass/tools/ios/package_ios_native_plugin.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

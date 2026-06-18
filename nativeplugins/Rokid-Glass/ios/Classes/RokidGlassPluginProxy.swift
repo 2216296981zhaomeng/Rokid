@@ -1,10 +1,18 @@
 import Foundation
 import UIKit
 
+@objc(UniPluginProtocol)
+public protocol UniPluginProtocol: NSObjectProtocol {}
+
 @objc(RokidGlassPluginProxy)
 @objcMembers
-public class RokidGlassPluginProxy: NSObject {
+public class RokidGlassPluginProxy: NSObject, UniPluginProtocol {
+    public func onCreateUniPlugin() {
+        RokidGlassBridge.bootstrapDefault()
+    }
+
     public func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        RokidGlassBridge.bootstrapDefault()
         return true
     }
 
@@ -25,6 +33,23 @@ public class RokidGlassPluginProxy: NSObject {
             return false
         }
         return RokidGlassBridge.handleOpenURL(url)
+    }
+
+    @available(iOS 13.0, *)
+    public func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        for context in URLContexts {
+            if RokidGlassBridge.handleOpenURL(context.url) {
+                return
+            }
+        }
+    }
+
+    @available(iOS 13.0, *)
+    public func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        guard userActivity.activityType == NSUserActivityTypeBrowsingWeb, let url = userActivity.webpageURL else {
+            return
+        }
+        _ = RokidGlassBridge.handleOpenURL(url)
     }
 }
 

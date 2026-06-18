@@ -26,25 +26,16 @@
 - (void)checkPermissions:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)requestAuthorization:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)connectCustomView:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
-- (void)connectCustomApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)openCustomView:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)updateCustomView:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)closeCustomView:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
-- (void)openApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
-- (void)stopApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
-- (void)queryApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
-- (void)installApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
-- (void)uninstallApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)startAudioRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)stopAudioRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
-- (void)takePhoto:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
-- (void)sendCustomCommand:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
-- (void)startVideoRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
-- (void)stopVideoRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)isBluetoothConnected:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)requestSystemInfo:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)requestGlassDeviceInfo:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)getState:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
+- (void)handleOpenURL:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)releaseSession:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 @end
 #endif
@@ -66,28 +57,18 @@ UNI_EXPORT_METHOD(@selector(initSDK:callback:))
 UNI_EXPORT_METHOD(@selector(checkPermissions:callback:))
 UNI_EXPORT_METHOD(@selector(requestAuthorization:callback:))
 UNI_EXPORT_METHOD(@selector(connectCustomView:callback:))
-UNI_EXPORT_METHOD(@selector(connectCustomApp:callback:))
 UNI_EXPORT_METHOD(@selector(openCustomView:callback:))
 UNI_EXPORT_METHOD(@selector(updateCustomView:callback:))
 UNI_EXPORT_METHOD(@selector(closeCustomView:callback:))
-UNI_EXPORT_METHOD(@selector(openApp:callback:))
-UNI_EXPORT_METHOD(@selector(stopApp:callback:))
-UNI_EXPORT_METHOD(@selector(queryApp:callback:))
-UNI_EXPORT_METHOD(@selector(installApp:callback:))
-UNI_EXPORT_METHOD(@selector(uninstallApp:callback:))
 UNI_EXPORT_METHOD(@selector(startAudioRecord:callback:))
 UNI_EXPORT_METHOD(@selector(stopAudioRecord:callback:))
 UNI_EXPORT_METHOD(@selector(startAudio:callback:))
 UNI_EXPORT_METHOD(@selector(stopAudio:callback:))
-UNI_EXPORT_METHOD(@selector(takePhoto:callback:))
-UNI_EXPORT_METHOD(@selector(sendCustomCommand:callback:))
-UNI_EXPORT_METHOD(@selector(sendCustomMessage:callback:))
-UNI_EXPORT_METHOD(@selector(startVideoRecord:callback:))
-UNI_EXPORT_METHOD(@selector(stopVideoRecord:callback:))
 UNI_EXPORT_METHOD(@selector(isBluetoothConnected:callback:))
 UNI_EXPORT_METHOD(@selector(requestSystemInfo:callback:))
 UNI_EXPORT_METHOD(@selector(requestGlassDeviceInfo:callback:))
 UNI_EXPORT_METHOD(@selector(getState:callback:))
+UNI_EXPORT_METHOD(@selector(handleOpenURL:callback:))
 UNI_EXPORT_METHOD(@selector(release:callback:))
 
 - (RokidGlassBridge *)bridge {
@@ -117,10 +98,6 @@ UNI_EXPORT_METHOD(@selector(release:callback:))
     [self.bridge connectCustomView:options callback:callback];
 }
 
-- (void)connectCustomApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
-    [self.bridge connectCustomApp:options callback:callback];
-}
-
 - (void)openCustomView:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
     [self.bridge openCustomView:options callback:callback];
 }
@@ -131,26 +108,6 @@ UNI_EXPORT_METHOD(@selector(release:callback:))
 
 - (void)closeCustomView:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
     [self.bridge closeCustomView:options callback:callback];
-}
-
-- (void)openApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
-    [self.bridge openApp:options callback:callback];
-}
-
-- (void)stopApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
-    [self.bridge stopApp:options callback:callback];
-}
-
-- (void)queryApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
-    [self.bridge queryApp:options callback:callback];
-}
-
-- (void)installApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
-    [self.bridge installApp:options callback:callback];
-}
-
-- (void)uninstallApp:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
-    [self.bridge uninstallApp:options callback:callback];
 }
 
 - (void)startAudioRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
@@ -169,26 +126,6 @@ UNI_EXPORT_METHOD(@selector(release:callback:))
     [self.bridge stopAudioRecord:options callback:callback];
 }
 
-- (void)takePhoto:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
-    [self.bridge takePhoto:options callback:callback];
-}
-
-- (void)sendCustomCommand:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
-    [self.bridge sendCustomCommand:options callback:callback];
-}
-
-- (void)sendCustomMessage:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
-    [self.bridge sendCustomCommand:options callback:callback];
-}
-
-- (void)startVideoRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
-    [self.bridge startVideoRecord:options callback:callback];
-}
-
-- (void)stopVideoRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
-    [self.bridge stopVideoRecord:options callback:callback];
-}
-
 - (void)isBluetoothConnected:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
     [self.bridge isBluetoothConnected:options callback:callback];
 }
@@ -203,6 +140,10 @@ UNI_EXPORT_METHOD(@selector(release:callback:))
 
 - (void)getState:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
     [self.bridge getState:options callback:callback];
+}
+
+- (void)handleOpenURL:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
+    [self.bridge handleOpenURL:options callback:callback];
 }
 
 - (void)release:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
