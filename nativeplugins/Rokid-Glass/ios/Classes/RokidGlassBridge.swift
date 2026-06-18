@@ -247,7 +247,7 @@ public final class RokidGlassBridge: NSObject {
         guard ensureAuthenticated(callback) else { return }
         applyIdentity(options)
         initializeIfNeeded(sessionType, options: options)
-        audioType = stringOption(options, "iosRecordType", stringOption(options, "recordType", stringOption(options, "type", "audio_stream")))
+        audioType = stringOption(options, "iosRecordType", stringOption(options, "recordType", stringOption(options, "type", "test")))
         audioCodecType = intOption(options, "codecType", 1)
         let scene = audioSceneOption(options, defaultValue: .conference)
         audioSceneId = scene.rawValue
@@ -286,7 +286,7 @@ public final class RokidGlassBridge: NSObject {
             "bleConnected": RGCxrClientBLE.shared.isConnected,
             "connectedDeviceName": RGCxrClientBLE.shared.connectedDeviceName ?? ""
         ]) { _, new in new })
-        if boolOption(options, "changeAudioScene", true) {
+        if boolOption(options, "changeAudioScene", false) {
             client.changeAudioSceneId(scene) { [weak self] success in
                 guard let self = self else { return }
                 DispatchQueue.main.async {
@@ -865,27 +865,25 @@ public final class RokidGlassBridge: NSObject {
         let root: [String: Any] = [
             "type": "LinearLayout",
             "props": [
-                "id": "root",
                 "layout_width": "match_parent",
                 "layout_height": "match_parent",
                 "orientation": "vertical",
-                "gravity": "center_horizontal",
-                "marginTop": "160dp",
-                "marginBottom": "80dp",
-                "backgroundColor": "#FF000000"
+                "gravity": "center_vertical",
+                "paddingTop": "140dp",
+                "paddingBottom": "100dp"
             ],
             "children": [
                 [
                     "type": "TextView",
                     "props": [
-                        "id": "titleView",
+                        "id": "tv_title",
                         "layout_width": "wrap_content",
                         "layout_height": "wrap_content",
                         "text": title,
-                        "textColor": "#FFFFFF",
-                        "textSize": "20sp",
-                        "gravity": "center",
+                        "textColor": "#FF00FF00",
+                        "textSize": "16sp",
                         "textStyle": "bold",
+                        "marginBottom": "20dp",
                         "paddingStart": "16dp",
                         "paddingEnd": "16dp"
                     ]
@@ -897,10 +895,9 @@ public final class RokidGlassBridge: NSObject {
                         "layout_width": "wrap_content",
                         "layout_height": "wrap_content",
                         "text": text,
-                        "textColor": "#00FF00",
+                        "textColor": "#FF00FF00",
                         "textSize": "16sp",
                         "gravity": "center",
-                        "marginTop": "16dp",
                         "paddingStart": "16dp",
                         "paddingEnd": "16dp"
                     ]
@@ -954,7 +951,7 @@ public final class RokidGlassBridge: NSObject {
             "variantCount": variants.count
         ]))
 
-        client.openCustomView(variant.json) { [weak self] success in
+        client.openCustomView(variant.json) { [weak self] success, errorCode in
             guard let self = self else { return }
             DispatchQueue.main.async {
                 guard requestId == self.customViewOpenRequestId else { return }
@@ -974,10 +971,11 @@ public final class RokidGlassBridge: NSObject {
                 }
 
                 self.lastCustomViewStage = "failed"
-                self.lastCustomViewErrorCode = 1003
-                self.lastCustomViewMessage = "openCustomView failed: \(variant.name)"
+                self.lastCustomViewErrorCode = errorCode ?? 1003
+                self.lastCustomViewMessage = "openCustomView failed: \(variant.name), errorCode=\(String(describing: errorCode))"
                 self.emit("customViewOpenFailed", self.customViewPayload(extra: [
                     "success": false,
+                    "errorCode": errorCode ?? -1,
                     "variantIndex": index,
                     "variantCount": variants.count
                 ]))
@@ -995,10 +993,11 @@ public final class RokidGlassBridge: NSObject {
                     return
                 }
 
-                let message = "openCustomView failed after \(variants.count) variants"
+                let message = "openCustomView failed after \(variants.count) variants, lastErrorCode=\(String(describing: errorCode))"
                 self.lastCustomViewMessage = message
                 let payload = self.customViewPayload(extra: [
                     "success": false,
+                    "errorCode": errorCode ?? -1,
                     "variantIndex": index,
                     "variantCount": variants.count
                 ])
@@ -1041,12 +1040,12 @@ public final class RokidGlassBridge: NSObject {
         return jsonString([
             "type": "LinearLayout",
             "props": [
-                "id": "root",
                 "layout_width": "match_parent",
                 "layout_height": "match_parent",
                 "orientation": "vertical",
-                "gravity": "center",
-                "backgroundColor": "#FF000000"
+                "gravity": "center_vertical",
+                "paddingTop": "140dp",
+                "paddingBottom": "100dp"
             ],
             "children": [
                 [
@@ -1056,8 +1055,10 @@ public final class RokidGlassBridge: NSObject {
                         "layout_width": "wrap_content",
                         "layout_height": "wrap_content",
                         "text": title,
-                        "textColor": "#FFFFFFFF",
-                        "textSize": "18sp"
+                        "textColor": "#FF00FF00",
+                        "textSize": "16sp",
+                        "textStyle": "bold",
+                        "marginBottom": "20dp"
                     ]
                 ],
                 [
@@ -1067,8 +1068,9 @@ public final class RokidGlassBridge: NSObject {
                         "layout_width": "wrap_content",
                         "layout_height": "wrap_content",
                         "text": text,
-                        "textColor": "#FF00FF66",
-                        "textSize": "16sp"
+                        "textColor": "#FF00FF00",
+                        "textSize": "16sp",
+                        "gravity": "center"
                     ]
                 ]
             ]
@@ -1077,16 +1079,30 @@ public final class RokidGlassBridge: NSObject {
 
     private func textOnlyCustomViewJson(text: String) -> String {
         return jsonString([
-            "type": "TextView",
+            "type": "LinearLayout",
             "props": [
-                "id": "textView",
                 "layout_width": "match_parent",
                 "layout_height": "match_parent",
-                "gravity": "center",
-                "text": text,
-                "textColor": "#FFFFFFFF",
-                "textSize": "18sp",
-                "backgroundColor": "#FF000000"
+                "orientation": "vertical",
+                "gravity": "center_vertical",
+                "paddingTop": "140dp",
+                "paddingBottom": "100dp"
+            ],
+            "children": [
+                [
+                    "type": "TextView",
+                    "props": [
+                        "id": "textView",
+                        "layout_width": "wrap_content",
+                        "layout_height": "wrap_content",
+                        "text": text,
+                        "textColor": "#FF00FF00",
+                        "textSize": "16sp",
+                        "gravity": "center",
+                        "paddingStart": "16dp",
+                        "paddingEnd": "16dp"
+                    ]
+                ]
             ]
         ])
     }
