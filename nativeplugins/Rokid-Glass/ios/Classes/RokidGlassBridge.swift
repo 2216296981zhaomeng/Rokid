@@ -15,7 +15,7 @@ public final class RokidGlassBridge: NSObject {
     private static var initializedSessionType = "customView"
 
     private let client: RGCxrClient = CxrClient.shared
-    private let bridgeVersion = "ios-cxrl-1.0.7-audio-stream-scene-20260618"
+    private let bridgeVersion = "ios-cxrl-1.0.8-customview-fallback-20260618"
     private var cancellables = Set<AnyCancellable>()
     private var eventCallback: RokidGlassCallback?
     private var pendingAuthorizationCallback: RokidGlassCallback?
@@ -35,6 +35,12 @@ public final class RokidGlassBridge: NSObject {
     private var audioCodecType = -1
     private var audioSceneId = -1
     private var audioType = "agent"
+    private var customViewOpenRequestId: Int64 = 0
+    private var lastCustomViewStage = "idle"
+    private var lastCustomViewVariant = ""
+    private var lastCustomViewErrorCode = -1
+    private var lastCustomViewMessage = ""
+    private var lastCustomViewJsonBytes = 0
 
     private let audioQueue = DispatchQueue(label: "com.zhaiwo.agent.rokid.ios.audio")
     private var pcmFileHandle: FileHandle?
@@ -157,20 +163,42 @@ public final class RokidGlassBridge: NSObject {
         sessionType = "customView"
         applyIdentity(options)
         initializeIfNeeded(sessionType, options: options)
-        let viewJson = stringOption(options, "viewJson", defaultCustomViewJson(
-            title: stringOption(options, "title", "宅喔带看"),
-            text: stringOption(options, "text", "眼镜端场景已打开")
-        ))
-        client.openCustomView(viewJson) { [weak self] success, errorCode in
-            guard let self = self else { return }
-            DispatchQueue.main.async {
-                self.sceneReady = success
-                let payload = self.stateJson().merging([
-                    "errorCode": errorCode as Any
-                ]) { _, new in new }
-                self.emit(success ? "customViewOpened" : "customViewError", payload)
-                self.invoke(callback, success ? self.ok(payload) : self.error(1003, "openCustomView failed: \(String(describing: errorCode))"))
+        let title = stringOption(options, "title", "宅喔带看")
+        let text = stringOption(options, "text", "眼镜端场景已打开")
+        let requestedViewJson = stringOption(options, "viewJson", defaultCustomViewJson(title: title, text: text))
+        let variants = customViewOpenVariants(options: options, requestedViewJson: requestedViewJson, title: title, text: text)
+        customViewOpenRequestId += 1
+        let requestId = customViewOpenRequestId
+        sceneReady = false
+        lastCustomViewStage = "preparing"
+        lastCustomViewVariant = ""
+        lastCustomViewErrorCode = -1
+        lastCustomViewMessage = ""
+        lastCustomViewJsonBytes = 0
+        emit("customViewOpening", customViewPayload(extra: [
+            "variantCount": variants.count,
+            "closeBeforeOpen": boolOption(options, "closeBeforeOpen", true)
+        ]))
+
+        let closeBeforeOpen = boolOption(options, "closeBeforeOpen", true)
+        if closeBeforeOpen {
+            lastCustomViewStage = "closingBeforeOpen"
+            client.closeCustomView(defaultCustomViewJson(title: title, text: "")) { [weak self] success in
+                guard let self = self else { return }
+                DispatchQueue.main.async {
+                    guard requestId == self.customViewOpenRequestId else { return }
+                    if self.lastCustomViewStage == "closingBeforeOpen" {
+                        self.lastCustomViewStage = success ? "closedBeforeOpen" : "closeBeforeOpenFailed"
+                    }
+                    self.emit("customViewPreclose", self.customViewPayload(extra: [
+                        "success": success
+                    ]))
+                }
             }
+        }
+        let delayMs = closeBeforeOpen ? max(250, intOption(options, "openDelayMs", 600)) : max(0, intOption(options, "openDelayMs", 0))
+        DispatchQueue.main.asyncAfter(deadline: .now() + (Double(delayMs) / 1000.0)) { [weak self] in
+            self?.openCustomViewVariant(requestId: requestId, variants: variants, index: 0, callback: callback)
         }
     }
 
@@ -347,7 +375,7 @@ public final class RokidGlassBridge: NSObject {
 
     public static func bootstrapDefault() {
         guard !initialized else { return }
-        CxrClient.initialize(mode: .customView, options: .init(appDisplayName: "宅喔经纪人", pageName: "com.tcwang.agent"))
+        CxrClient.initialize(mode: .customView, options: .init(appDisplayName: "宅喔经纪人", pageName: nil))
         initialized = true
         initializedSessionType = "customView"
     }
@@ -463,7 +491,8 @@ public final class RokidGlassBridge: NSObject {
             CxrClient.initialize(mode: .customApp, options: .init(appDisplayName: appDisplayName, pageName: packageName))
             Self.initializedSessionType = "customApp"
         } else {
-            let pageName = iosPageName.isEmpty ? iosBundleId : iosPageName
+            let requestedPageName = stringOption(options, "customViewPageName", stringOption(options, "pageName", stringOption(options, "iosPageName", iosPageName)))
+            let pageName = boolOption(options, "useCustomViewPageName", false) ? requestedPageName : ""
             CxrClient.initialize(mode: .customView, options: .init(
                 appDisplayName: appDisplayName,
                 pageName: pageName.isEmpty ? nil : pageName
@@ -891,6 +920,195 @@ public final class RokidGlassBridge: NSObject {
         ])
     }
 
+    private func openCustomViewVariant(
+        requestId: Int64,
+        variants: [(name: String, json: String)],
+        index: Int,
+        callback: RokidGlassCallback?
+    ) {
+        guard requestId == customViewOpenRequestId else { return }
+        guard index < variants.count else {
+            sceneReady = false
+            lastCustomViewStage = "failed"
+            lastCustomViewErrorCode = 1003
+            lastCustomViewMessage = "openCustomView failed after \(variants.count) variants"
+            let payload = customViewPayload(extra: [
+                "success": false,
+                "variantCount": variants.count
+            ])
+            emit("customViewError", payload)
+            invoke(callback, error(1003, lastCustomViewMessage))
+            return
+        }
+
+        let variant = variants[index]
+        sceneReady = false
+        lastCustomViewStage = "opening"
+        lastCustomViewVariant = variant.name
+        lastCustomViewErrorCode = -1
+        lastCustomViewMessage = ""
+        lastCustomViewJsonBytes = variant.json.data(using: .utf8)?.count ?? 0
+        emit("customViewOpenAttempt", customViewPayload(extra: [
+            "success": false,
+            "variantIndex": index,
+            "variantCount": variants.count
+        ]))
+
+        client.openCustomView(variant.json) { [weak self] success in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                guard requestId == self.customViewOpenRequestId else { return }
+                self.sceneReady = success
+                if success {
+                    self.lastCustomViewStage = "opened"
+                    self.lastCustomViewErrorCode = -1
+                    self.lastCustomViewMessage = ""
+                    let payload = self.customViewPayload(extra: [
+                        "success": true,
+                        "variantIndex": index,
+                        "variantCount": variants.count
+                    ])
+                    self.emit("customViewOpened", payload)
+                    self.invoke(callback, self.ok(payload))
+                    return
+                }
+
+                self.lastCustomViewStage = "failed"
+                self.lastCustomViewErrorCode = 1003
+                self.lastCustomViewMessage = "openCustomView failed: \(variant.name)"
+                self.emit("customViewOpenFailed", self.customViewPayload(extra: [
+                    "success": false,
+                    "variantIndex": index,
+                    "variantCount": variants.count
+                ]))
+
+                if index + 1 < variants.count {
+                    self.lastCustomViewStage = "retryWaiting"
+                    DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(500)) { [weak self] in
+                        self?.openCustomViewVariant(
+                            requestId: requestId,
+                            variants: variants,
+                            index: index + 1,
+                            callback: callback
+                        )
+                    }
+                    return
+                }
+
+                let message = "openCustomView failed after \(variants.count) variants"
+                self.lastCustomViewMessage = message
+                let payload = self.customViewPayload(extra: [
+                    "success": false,
+                    "variantIndex": index,
+                    "variantCount": variants.count
+                ])
+                self.emit("customViewError", payload)
+                self.invoke(callback, self.error(1003, message))
+            }
+        }
+    }
+
+    private func customViewOpenVariants(
+        options: NSDictionary?,
+        requestedViewJson: String,
+        title: String,
+        text: String
+    ) -> [(name: String, json: String)] {
+        var variants: [(name: String, json: String)] = []
+        if boolOption(options, "preferMinimalCustomView", false) {
+            appendCustomViewVariant(&variants, name: "compact", json: compactCustomViewJson(title: title, text: text))
+            appendCustomViewVariant(&variants, name: "textOnly", json: textOnlyCustomViewJson(text: text))
+        }
+        appendCustomViewVariant(&variants, name: "requested", json: requestedViewJson)
+        appendCustomViewVariant(&variants, name: "nativeDefault", json: defaultCustomViewJson(title: title, text: text))
+        appendCustomViewVariant(&variants, name: "compact", json: compactCustomViewJson(title: title, text: text))
+        appendCustomViewVariant(&variants, name: "textOnly", json: textOnlyCustomViewJson(text: text))
+        return variants
+    }
+
+    private func appendCustomViewVariant(
+        _ variants: inout [(name: String, json: String)],
+        name: String,
+        json: String
+    ) {
+        let trimmed = json.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard !variants.contains(where: { $0.json == trimmed }) else { return }
+        variants.append((name: name, json: trimmed))
+    }
+
+    private func compactCustomViewJson(title: String, text: String) -> String {
+        return jsonString([
+            "type": "LinearLayout",
+            "props": [
+                "id": "root",
+                "layout_width": "match_parent",
+                "layout_height": "match_parent",
+                "orientation": "vertical",
+                "gravity": "center",
+                "backgroundColor": "#FF000000"
+            ],
+            "children": [
+                [
+                    "type": "TextView",
+                    "props": [
+                        "id": "titleView",
+                        "layout_width": "wrap_content",
+                        "layout_height": "wrap_content",
+                        "text": title,
+                        "textColor": "#FFFFFFFF",
+                        "textSize": "18sp"
+                    ]
+                ],
+                [
+                    "type": "TextView",
+                    "props": [
+                        "id": "textView",
+                        "layout_width": "wrap_content",
+                        "layout_height": "wrap_content",
+                        "text": text,
+                        "textColor": "#FF00FF66",
+                        "textSize": "16sp"
+                    ]
+                ]
+            ]
+        ])
+    }
+
+    private func textOnlyCustomViewJson(text: String) -> String {
+        return jsonString([
+            "type": "TextView",
+            "props": [
+                "id": "textView",
+                "layout_width": "match_parent",
+                "layout_height": "match_parent",
+                "gravity": "center",
+                "text": text,
+                "textColor": "#FFFFFFFF",
+                "textSize": "18sp",
+                "backgroundColor": "#FF000000"
+            ]
+        ])
+    }
+
+    private func customViewPayload(extra: [String: Any] = [:]) -> [String: Any] {
+        var payload = stateJson()
+        payload["customViewStage"] = lastCustomViewStage
+        payload["customViewVariant"] = lastCustomViewVariant
+        payload["customViewErrorCode"] = lastCustomViewErrorCode
+        payload["customViewMessage"] = lastCustomViewMessage
+        payload["customViewJsonBytes"] = lastCustomViewJsonBytes
+        payload["iosInitialized"] = Self.initialized
+        payload["iosInitializedSessionType"] = Self.initializedSessionType
+        payload["rokidAIAppInstalled"] = client.isRokidAppInstalled()
+        payload["bleConnected"] = RGCxrClientBLE.shared.isConnected
+        payload["connectedDeviceName"] = RGCxrClientBLE.shared.connectedDeviceName ?? ""
+        for (key, value) in extra {
+            payload[key] = value
+        }
+        return payload
+    }
+
     private func jsonString(_ value: Any) -> String {
         guard JSONSerialization.isValidJSONObject(value),
               let data = try? JSONSerialization.data(withJSONObject: value, options: []),
@@ -966,8 +1184,16 @@ public final class RokidGlassBridge: NSObject {
             "pcmPath": pcmPath,
             "path": wavPath,
             "bridgeVersion": bridgeVersion,
+            "iosInitialized": Self.initialized,
+            "iosInitializedSessionType": Self.initializedSessionType,
             "iosBundleId": iosBundleId,
             "iosPageName": iosPageName,
+            "appDisplayName": appDisplayName,
+            "customViewStage": lastCustomViewStage,
+            "customViewVariant": lastCustomViewVariant,
+            "customViewErrorCode": lastCustomViewErrorCode,
+            "customViewMessage": lastCustomViewMessage,
+            "customViewJsonBytes": lastCustomViewJsonBytes,
             "nativeUpload": nativeAudioUploadEnabled,
             "nativeUploadState": nativeAudioUploadState,
             "nativeUploadError": nativeAudioUploadError,
@@ -981,6 +1207,8 @@ public final class RokidGlassBridge: NSObject {
             "deviceId": glassId,
             "sn": "",
             "deviceName": currentName,
+            "bleConnected": RGCxrClientBLE.shared.isConnected,
+            "connectedDeviceName": RGCxrClientBLE.shared.connectedDeviceName ?? "",
             "sessionId": currentSessionId,
             "glassDeviceInfo": [
                 "glassId": glassId,
