@@ -29,6 +29,7 @@
 - (void)openCustomView:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)updateCustomView:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)closeCustomView:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
+- (void)changeAudioSceneId:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)startAudioRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)stopAudioRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)isBluetoothConnected:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
@@ -60,6 +61,7 @@ UNI_EXPORT_METHOD(@selector(connectCustomView:callback:))
 UNI_EXPORT_METHOD(@selector(openCustomView:callback:))
 UNI_EXPORT_METHOD(@selector(updateCustomView:callback:))
 UNI_EXPORT_METHOD(@selector(closeCustomView:callback:))
+UNI_EXPORT_METHOD(@selector(changeAudioSceneId:callback:))
 UNI_EXPORT_METHOD(@selector(startAudioRecord:callback:))
 UNI_EXPORT_METHOD(@selector(stopAudioRecord:callback:))
 UNI_EXPORT_METHOD(@selector(startAudio:callback:))
@@ -108,6 +110,10 @@ UNI_EXPORT_METHOD(@selector(release:callback:))
 
 - (void)closeCustomView:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
     [self.bridge closeCustomView:options callback:callback];
+}
+
+- (void)changeAudioSceneId:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
+    [self.bridge changeAudioSceneId:options callback:callback];
 }
 
 - (void)startAudioRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {

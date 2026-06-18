@@ -15,7 +15,7 @@ public final class RokidGlassBridge: NSObject {
     private static var initializedSessionType = "customView"
 
     private let client: RGCxrClient = CxrClient.shared
-    private let bridgeVersion = "ios-cxrl-1.0.6-auth-callback-20260609"
+    private let bridgeVersion = "ios-cxrl-1.0.7-audio-stream-scene-20260618"
     private var cancellables = Set<AnyCancellable>()
     private var eventCallback: RokidGlassCallback?
     private var pendingAuthorizationCallback: RokidGlassCallback?
@@ -33,6 +33,7 @@ public final class RokidGlassBridge: NSObject {
     private var sceneReady = false
     private var audioStarted = false
     private var audioCodecType = -1
+    private var audioSceneId = -1
     private var audioType = "agent"
 
     private let audioQueue = DispatchQueue(label: "com.zhaiwo.agent.rokid.ios.audio")
@@ -197,12 +198,31 @@ public final class RokidGlassBridge: NSObject {
         }
     }
 
+    public func changeAudioSceneId(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        let scene = audioSceneOption(options, defaultValue: .conference)
+        audioSceneId = scene.rawValue
+        client.changeAudioSceneId(scene) { [weak self] success in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                let payload = self.stateJson().merging([
+                    "audioSceneId": scene.rawValue,
+                    "audioScene": self.audioSceneName(scene),
+                    "success": success
+                ]) { _, new in new }
+                self.emit(success ? "audioSceneChanged" : "audioSceneChangeFailed", payload)
+                self.invoke(callback, success ? self.ok(payload) : self.error(1006, "changeAudioSceneId failed"))
+            }
+        }
+    }
+
     public func startAudioRecord(_ options: NSDictionary?, callback: RokidGlassCallback?) {
         guard ensureAuthenticated(callback) else { return }
         applyIdentity(options)
         initializeIfNeeded(sessionType, options: options)
-        audioType = stringOption(options, "iosRecordType", stringOption(options, "recordType", stringOption(options, "type", "test")))
+        audioType = stringOption(options, "iosRecordType", stringOption(options, "recordType", stringOption(options, "type", "audio_stream")))
         audioCodecType = intOption(options, "codecType", 1)
+        let scene = audioSceneOption(options, defaultValue: .conference)
+        audioSceneId = scene.rawValue
         let useNativeUpload = boolOption(options, "nativeUpload", false)
         let nativeWsUrl = stringOption(options, "wsUrl", "")
         if useNativeUpload && nativeWsUrl.isEmpty {
@@ -231,11 +251,25 @@ public final class RokidGlassBridge: NSObject {
             "codec": "pcm",
             "codecType": audioCodecType,
             "audioCodecType": audioCodecType,
+            "audioSceneId": scene.rawValue,
+            "audioScene": audioSceneName(scene),
             "mode": "antClose",
             "nativeUpload": useNativeUpload,
             "bleConnected": RGCxrClientBLE.shared.isConnected,
             "connectedDeviceName": RGCxrClientBLE.shared.connectedDeviceName ?? ""
         ]) { _, new in new })
+        if boolOption(options, "changeAudioScene", true) {
+            client.changeAudioSceneId(scene) { [weak self] success in
+                guard let self = self else { return }
+                DispatchQueue.main.async {
+                    self.emit(success ? "audioSceneChanged" : "audioSceneChangeFailed", self.stateJson().merging([
+                        "audioSceneId": scene.rawValue,
+                        "audioScene": self.audioSceneName(scene),
+                        "success": success
+                    ]) { _, new in new })
+                }
+            }
+        }
         client.startRecord(audioType, codec: .pcm, mode: .antClose)
         emit("audioStateChanged", stateJson())
         invoke(callback, ok(stateJson().merging([
@@ -313,7 +347,7 @@ public final class RokidGlassBridge: NSObject {
 
     public static func bootstrapDefault() {
         guard !initialized else { return }
-        CxrClient.initialize(mode: .customView, options: .init(appDisplayName: nil, pageName: nil))
+        CxrClient.initialize(mode: .customView, options: .init(appDisplayName: "宅喔经纪人", pageName: "com.tcwang.agent"))
         initialized = true
         initializedSessionType = "customView"
     }
@@ -429,7 +463,11 @@ public final class RokidGlassBridge: NSObject {
             CxrClient.initialize(mode: .customApp, options: .init(appDisplayName: appDisplayName, pageName: packageName))
             Self.initializedSessionType = "customApp"
         } else {
-            CxrClient.initialize(mode: .customView, options: .init(appDisplayName: nil, pageName: nil))
+            let pageName = iosPageName.isEmpty ? iosBundleId : iosPageName
+            CxrClient.initialize(mode: .customView, options: .init(
+                appDisplayName: appDisplayName,
+                pageName: pageName.isEmpty ? nil : pageName
+            ))
             Self.initializedSessionType = "customView"
         }
         Self.initialized = true
@@ -922,6 +960,7 @@ public final class RokidGlassBridge: NSObject {
             "audioStarted": audioStarted,
             "audioCodecType": audioCodecType,
             "codecType": audioCodecType,
+            "audioSceneId": audioSceneId,
             "audioSessionId": audioSessionId,
             "audioChunkCount": audioChunkCount,
             "pcmPath": pcmPath,
@@ -970,6 +1009,44 @@ public final class RokidGlassBridge: NSObject {
             return name
         }
         return ""
+    }
+
+    private func audioSceneOption(_ options: NSDictionary?, defaultValue: RGCxrAudioSceneId) -> RGCxrAudioSceneId {
+        let sceneName = stringOption(options, "audioScene", "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        switch sceneName {
+        case "interaction", "interact", "default":
+            return .interaction
+        case "translation", "translate":
+            return .translation
+        case "call":
+            return .call
+        case "conference", "meeting", "full", "all", "both":
+            return .conference
+        default:
+            break
+        }
+        let raw = intOption(options, "audioSceneId", -1)
+        if let scene = RGCxrAudioSceneId(rawValue: raw) {
+            return scene
+        }
+        return defaultValue
+    }
+
+    private func audioSceneName(_ scene: RGCxrAudioSceneId) -> String {
+        switch scene {
+        case .interaction:
+            return "interaction"
+        case .translation:
+            return "translation"
+        case .call:
+            return "call"
+        case .conference:
+            return "conference"
+        @unknown default:
+            return "unknown"
+        }
     }
 
     private func ok(_ data: [String: Any]) -> [String: Any] {
