@@ -36,6 +36,8 @@
 - (void)changeAudioSceneId:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)startAudioRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)stopAudioRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
+- (void)startPhoneAudioRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
+- (void)stopPhoneAudioRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)isBluetoothConnected:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)requestSystemInfo:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
 - (void)requestGlassDeviceInfo:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback;
@@ -72,6 +74,8 @@ UNI_EXPORT_METHOD(@selector(stopApp:callback:))
 UNI_EXPORT_METHOD(@selector(changeAudioSceneId:callback:))
 UNI_EXPORT_METHOD(@selector(startAudioRecord:callback:))
 UNI_EXPORT_METHOD(@selector(stopAudioRecord:callback:))
+UNI_EXPORT_METHOD(@selector(startPhoneAudioRecord:callback:))
+UNI_EXPORT_METHOD(@selector(stopPhoneAudioRecord:callback:))
 UNI_EXPORT_METHOD(@selector(startAudio:callback:))
 UNI_EXPORT_METHOD(@selector(stopAudio:callback:))
 UNI_EXPORT_METHOD(@selector(isBluetoothConnected:callback:))
@@ -146,6 +150,14 @@ UNI_EXPORT_METHOD(@selector(release:callback:))
 
 - (void)stopAudioRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
     [self.bridge stopAudioRecord:options callback:callback];
+}
+
+- (void)startPhoneAudioRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
+    [self.bridge startPhoneAudioRecord:options callback:callback];
+}
+
+- (void)stopPhoneAudioRecord:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {
+    [self.bridge stopPhoneAudioRecord:options callback:callback];
 }
 
 - (void)startAudio:(NSDictionary *)options callback:(UniModuleKeepAliveCallback)callback {

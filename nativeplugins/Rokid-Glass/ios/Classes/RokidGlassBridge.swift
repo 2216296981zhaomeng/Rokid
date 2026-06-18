@@ -15,7 +15,7 @@ public final class RokidGlassBridge: NSObject {
     private static var initializedSessionType = "customView"
 
     private let client: RGCxrClient = CxrClient.shared
-    private let bridgeVersion = "ios-cxrl-1.0.11-customview-teleprompter-20260618"
+    private let bridgeVersion = "ios-cxrl-1.0.12-phone-audio-teleprompter-20260618"
     private var cancellables = Set<AnyCancellable>()
     private var eventCallback: RokidGlassCallback?
     private var pendingAuthorizationCallback: RokidGlassCallback?
@@ -61,6 +61,10 @@ public final class RokidGlassBridge: NSObject {
     private var nativeAudioDroppedBytes = 0
     private var nativeAudioSentBytes = 0
     private var nativeAudioSentChunks = 0
+    private var phoneAudioEngine: AVAudioEngine?
+    private var phoneAudioConverter: AVAudioConverter?
+    private var phoneAudioStarted = false
+    private var phoneAudioSource = "rokid_cxr_audio_callback"
 
     private let sampleRate = 16000
     private let channels = 1
@@ -306,6 +310,9 @@ public final class RokidGlassBridge: NSObject {
 
     public func startAudioRecord(_ options: NSDictionary?, callback: RokidGlassCallback?) {
         guard ensureAuthenticated(callback) else { return }
+        if phoneAudioStarted {
+            _ = stopPhoneAudioEngine(reason: "switchToGlassesAudio")
+        }
         let nextType = stringOption(options, "sessionType", stringOption(options, "mode", sessionType))
         if nextType == "customApp" {
             sessionType = "customApp"
@@ -376,10 +383,54 @@ public final class RokidGlassBridge: NSObject {
     }
 
     public func stopAudioRecord(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        if phoneAudioStarted {
+            let data = stopPhoneAudioEngine(reason: "apiStop")
+            invoke(callback, ok(data))
+            return
+        }
         if audioStarted {
             client.stopRecord(audioType)
         }
         let data = finalizeAudioStop(reason: "apiStop", sendStop: true, uploadWait: 5.0)
+        invoke(callback, ok(data))
+    }
+
+    public func startPhoneAudioRecord(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        let session = AVAudioSession.sharedInstance()
+        let startBlock = { [weak self] in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                do {
+                    let payload = try self.startPhoneAudioEngine(options)
+                    self.invoke(callback, self.ok(payload))
+                } catch {
+                    self.invoke(callback, self.error(1010, error.localizedDescription))
+                }
+            }
+        }
+
+        switch session.recordPermission {
+        case .granted:
+            startBlock()
+        case .denied:
+            invoke(callback, error(1010, "Microphone permission denied"))
+        case .undetermined:
+            session.requestRecordPermission { granted in
+                if granted {
+                    startBlock()
+                } else {
+                    DispatchQueue.main.async {
+                        self.invoke(callback, self.error(1010, "Microphone permission denied"))
+                    }
+                }
+            }
+        @unknown default:
+            startBlock()
+        }
+    }
+
+    public func stopPhoneAudioRecord(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        let data = stopPhoneAudioEngine(reason: "apiStop")
         invoke(callback, ok(data))
     }
 
@@ -408,6 +459,9 @@ public final class RokidGlassBridge: NSObject {
     }
 
     public func releaseSession(_ options: NSDictionary?, callback: RokidGlassCallback?) {
+        if phoneAudioStarted {
+            _ = stopPhoneAudioEngine(reason: "release")
+        }
         if audioStarted {
             client.stopRecord(audioType)
         }
@@ -629,6 +683,126 @@ public final class RokidGlassBridge: NSObject {
         return false
     }
 
+    private func startPhoneAudioEngine(_ options: NSDictionary?) throws -> [String: Any] {
+        if phoneAudioStarted {
+            _ = stopPhoneAudioEngine(reason: "restart")
+        } else if audioStarted {
+            client.stopRecord(audioType)
+            _ = finalizeAudioStop(reason: "switchToPhoneAudio", sendStop: true, uploadWait: 1.0)
+        }
+        audioType = stringOption(options, "recordType", stringOption(options, "type", "phone"))
+        audioCodecType = 1
+        phoneAudioSource = "phone_microphone"
+        nativeAudioUploadEnabled = false
+        stopNativeAudioUpload(sendStop: false, wait: 1.0)
+        guard resetAudioBuffers() else {
+            audioCodecType = -1
+            throw NSError(domain: "RokidGlassBridge", code: 1011, userInfo: [NSLocalizedDescriptionKey: "Failed to create phone audio file"])
+        }
+
+        let audioSession = AVAudioSession.sharedInstance()
+        try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker])
+        try? audioSession.setPreferredSampleRate(Double(sampleRate))
+        try? audioSession.setPreferredInputNumberOfChannels(channels)
+        if let builtInMic = audioSession.availableInputs?.first(where: { $0.portType == .builtInMic }) {
+            try? audioSession.setPreferredInput(builtInMic)
+        }
+        try audioSession.setActive(true, options: [])
+
+        let engine = AVAudioEngine()
+        let inputNode = engine.inputNode
+        let inputFormat = inputNode.outputFormat(forBus: 0)
+        guard inputFormat.sampleRate > 0,
+              let outputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: Double(sampleRate), channels: AVAudioChannelCount(channels), interleaved: true),
+              let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
+            throw NSError(domain: "RokidGlassBridge", code: 1012, userInfo: [NSLocalizedDescriptionKey: "Failed to create phone audio converter"])
+        }
+
+        phoneAudioEngine = engine
+        phoneAudioConverter = converter
+        phoneAudioStarted = true
+        audioStarted = true
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, time in
+            self?.handlePhoneAudioBuffer(buffer, inputFormat: inputFormat, outputFormat: outputFormat, timestamp: time.sampleTime)
+        }
+        do {
+            engine.prepare()
+            try engine.start()
+        } catch {
+            inputNode.removeTap(onBus: 0)
+            phoneAudioEngine = nil
+            phoneAudioConverter = nil
+            phoneAudioStarted = false
+            audioStarted = false
+            closePcmFile()
+            throw error
+        }
+        let payload = stateJson().merging([
+            "recordType": audioType,
+            "audioSource": phoneAudioSource,
+            "codec": "pcm",
+            "codecType": audioCodecType,
+            "audioCodecType": audioCodecType,
+            "sampleRate": sampleRate,
+            "channels": channels,
+            "bitsPerSample": bitsPerSample
+        ]) { _, new in new }
+        emit("phoneAudioStarted", payload)
+        return payload
+    }
+
+    private func stopPhoneAudioEngine(reason: String) -> [String: Any] {
+        if Thread.isMainThread {
+            phoneAudioEngine?.inputNode.removeTap(onBus: 0)
+            phoneAudioEngine?.stop()
+        } else {
+            DispatchQueue.main.sync {
+                phoneAudioEngine?.inputNode.removeTap(onBus: 0)
+                phoneAudioEngine?.stop()
+            }
+        }
+        phoneAudioEngine = nil
+        phoneAudioConverter = nil
+        phoneAudioStarted = false
+        let data = finalizeAudioStop(reason: reason, sendStop: true, uploadWait: 1.0)
+        emit("phoneAudioStopped", data)
+        return data
+    }
+
+    private func handlePhoneAudioBuffer(_ buffer: AVAudioPCMBuffer, inputFormat: AVAudioFormat, outputFormat: AVAudioFormat, timestamp: AVAudioFramePosition) {
+        guard phoneAudioStarted, let converter = phoneAudioConverter else { return }
+        let ratio = outputFormat.sampleRate / max(1.0, inputFormat.sampleRate)
+        let capacity = max(1, AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 8)
+        guard let converted = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: capacity) else { return }
+        var provided = false
+        var convertError: NSError?
+        let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
+            if provided {
+                outStatus.pointee = .noDataNow
+                return nil
+            }
+            provided = true
+            outStatus.pointee = .haveData
+            return buffer
+        }
+        converter.convert(to: converted, error: &convertError, withInputFrom: inputBlock)
+        if let convertError = convertError {
+            emit("phoneAudioError", stateJson().merging(["message": convertError.localizedDescription]) { _, new in new })
+            return
+        }
+        guard let data = pcmData(from: converted), !data.isEmpty else { return }
+        let timestampMs = UInt64(Date().timeIntervalSince1970 * 1000)
+        audioQueue.async { [weak self] in
+            self?.handleAudioData(data, timestamp: timestampMs)
+        }
+    }
+
+    private func pcmData(from buffer: AVAudioPCMBuffer) -> Data? {
+        let audioBuffer = buffer.audioBufferList.pointee.mBuffers
+        guard let pointer = audioBuffer.mData, audioBuffer.mDataByteSize > 0 else { return nil }
+        return Data(bytes: pointer, count: Int(audioBuffer.mDataByteSize))
+    }
+
     private func handleAudioData(_ data: Data, timestamp: UInt64) {
         guard audioStarted else { return }
         guard let handle = pcmFileHandle else {
@@ -663,6 +837,10 @@ public final class RokidGlassBridge: NSObject {
             "final": final,
             "timestamp": timestamp,
             "codec": "pcm",
+            "audioSource": phoneAudioStarted ? "phone_microphone" : "rokid_cxr_audio_callback",
+            "source": phoneAudioStarted ? "phone_microphone" : "rokid_cxr_audio_callback",
+            "audioCodecType": audioCodecType,
+            "codecType": audioCodecType,
             "sampleRate": sampleRate,
             "channels": channels,
             "bitsPerSample": bitsPerSample
@@ -1259,6 +1437,8 @@ public final class RokidGlassBridge: NSObject {
             "glassBtConnected": client.auth.isAuthenticated() || !token.isEmpty,
             "sceneReady": sceneReady,
             "audioStarted": audioStarted,
+            "phoneAudioStarted": phoneAudioStarted,
+            "audioSource": phoneAudioStarted ? "phone_microphone" : phoneAudioSource,
             "audioCodecType": audioCodecType,
             "codecType": audioCodecType,
             "audioSceneId": audioSceneId,
