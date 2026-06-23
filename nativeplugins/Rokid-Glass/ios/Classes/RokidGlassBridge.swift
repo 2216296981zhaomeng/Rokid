@@ -209,7 +209,7 @@ public final class RokidGlassBridge: NSObject {
             }
         }
         let delayMs = closeBeforeOpen ? max(250, intOption(options, "openDelayMs", 600)) : max(0, intOption(options, "openDelayMs", 0))
-        let attemptTimeoutMs = max(1500, min(6000, intOption(options, "openAttemptTimeoutMs", 2500)))
+        let attemptTimeoutMs = max(1500, min(12000, intOption(options, "openAttemptTimeoutMs", 6000)))
         DispatchQueue.main.asyncAfter(deadline: .now() + (Double(delayMs) / 1000.0)) { [weak self] in
             self?.openCustomViewVariant(
                 requestId: requestId,

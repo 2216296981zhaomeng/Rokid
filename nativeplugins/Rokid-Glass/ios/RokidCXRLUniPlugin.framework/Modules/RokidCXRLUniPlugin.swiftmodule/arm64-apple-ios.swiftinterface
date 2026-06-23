@@ -1,52 +1,65 @@
 // swift-interface-format-version: 1.0
-// swift-compiler-version: Apple Swift version 6.2.4 effective-5.10 (swiftlang-6.2.4.1.4 clang-1700.6.4.2)
-// swift-module-flags: -target arm64-apple-ios16.0 -enable-objc-interop -enable-library-evolution -swift-version 5 -enforce-exclusivity=checked -O -enable-experimental-feature DebugDescriptionMacro -enable-bare-slash-regex -module-name RokidCXRLUniPlugin
-// swift-module-flags-ignorable: -no-verify-emitted-module-interface -formal-cxx-interoperability-mode=off -interface-compiler-version 6.2.4
+// swift-compiler-version: Apple Swift version 6.1.2 effective-5.10 (swiftlang-6.1.2.1.2 clang-1700.0.13.5)
+// swift-module-flags: -target arm64-apple-ios16.0 -enable-objc-interop -enable-library-evolution -swift-version 5 -O -module-name RokidCXRLUniPlugin
+// swift-module-flags-ignorable:  -interface-compiler-version 6.1.2
+import AVFoundation
 import Combine
 import Foundation
-import RGCoreKit
 import RGCxrClient
-@_exported import RokidCXRLUniPlugin
 import Swift
 import UIKit
 import _Concurrency
 import _StringProcessing
 import _SwiftConcurrencyShims
-@_inheritsConvenienceInitializers @objc(RokidCXRLBridge) final public class RokidCXRLBridge : ObjectiveC.NSObject {
-  @objc(sharedInstance) public static func sharedInstance() -> RokidCXRLUniPlugin.RokidCXRLBridge
-  @objc(bindEventsIfNeeded) final public func bindEventsIfNeeded()
-  @objc(initializeClient:completion:) final public func initializeClient(_ options: Foundation.NSDictionary, completion: @escaping (Foundation.NSDictionary) -> Swift.Void)
-  @objc(configureAuth:) final public func configureAuth(_ options: Foundation.NSDictionary) -> Foundation.NSDictionary
-  @objc(authenticate:completion:) final public func authenticate(_ options: Foundation.NSDictionary, completion: @escaping (Foundation.NSDictionary) -> Swift.Void)
-  @objc(refreshToken:completion:) final public func refreshToken(_ options: Foundation.NSDictionary, completion: @escaping (Foundation.NSDictionary) -> Swift.Void)
-  @objc(clearAuthentication) final public func clearAuthentication() -> Foundation.NSDictionary
-  @objc(watchEvents:) final public func watchEvents(_ handler: @escaping (Foundation.NSDictionary) -> Swift.Void)
-  @objc(unwatchEvents) final public func unwatchEvents() -> Foundation.NSDictionary
-  @objc(setNotifyEventListenCmds:) final public func setNotifyEventListenCmds(_ options: Foundation.NSDictionary) -> Foundation.NSDictionary
-  @objc(sendCustomCmd:completion:) final public func sendCustomCmd(_ options: Foundation.NSDictionary, completion: @escaping (Foundation.NSDictionary) -> Swift.Void)
-  @objc(openCustomView:completion:) final public func openCustomView(_ options: Foundation.NSDictionary, completion: @escaping (Foundation.NSDictionary) -> Swift.Void)
-  @objc(updateCustomView:completion:) final public func updateCustomView(_ options: Foundation.NSDictionary, completion: @escaping (Foundation.NSDictionary) -> Swift.Void)
-  @objc(closeCustomView:completion:) final public func closeCustomView(_ options: Foundation.NSDictionary, completion: @escaping (Foundation.NSDictionary) -> Swift.Void)
-  @objc(sendCustomViewIcons:completion:) final public func sendCustomViewIcons(_ options: Foundation.NSDictionary, completion: @escaping (Foundation.NSDictionary) -> Swift.Void)
-  @objc(startRecord:) final public func startRecord(_ options: Foundation.NSDictionary) -> Foundation.NSDictionary
-  @objc(stopRecord:) final public func stopRecord(_ options: Foundation.NSDictionary) -> Foundation.NSDictionary
-  @objc(startPlayAudio:) final public func startPlayAudio(_ options: Foundation.NSDictionary) -> Foundation.NSDictionary
-  @objc(stopPlayAudio) final public func stopPlayAudio() -> Foundation.NSDictionary
-  @objc(feedAudio:) final public func feedAudio(_ options: Foundation.NSDictionary) -> Foundation.NSDictionary
-  @objc(takePhoto) final public func takePhoto() -> Foundation.NSDictionary
-  @objc(takePhotoWithData:completion:) final public func takePhotoWithData(_ options: Foundation.NSDictionary, completion: @escaping (Foundation.NSDictionary) -> Swift.Void)
-  @objc(queryApp:) final public func queryApp(_ completion: @escaping (Foundation.NSDictionary) -> Swift.Void)
-  @objc(openApp:completion:) final public func openApp(_ options: Foundation.NSDictionary, completion: @escaping (Foundation.NSDictionary) -> Swift.Void)
-  @objc(stopApp:completion:) final public func stopApp(_ options: Foundation.NSDictionary, completion: @escaping (Foundation.NSDictionary) -> Swift.Void)
-  @objc(uninstallApp:completion:) final public func uninstallApp(_ options: Foundation.NSDictionary, completion: @escaping (Foundation.NSDictionary) -> Swift.Void)
-  @objc(installApp:completion:) final public func installApp(_ options: Foundation.NSDictionary, completion: @escaping (Foundation.NSDictionary) -> Swift.Void)
-  @objc(changeAudioSceneId:completion:) final public func changeAudioSceneId(_ options: Foundation.NSDictionary, completion: @escaping (Foundation.NSDictionary) -> Swift.Void)
-  @objc(handleOpenURL:) final public func handleOpenURL(_ url: Foundation.URL) -> Swift.Bool
-  @objc(isInitialized) final public func isInitialized() -> Foundation.NSDictionary
-  @objc(isAuthenticated) final public func isAuthenticated() -> Foundation.NSDictionary
-  @objc(getAuthState) final public func getAuthState() -> Foundation.NSDictionary
-  @objc(getCurrentToken) final public func getCurrentToken() -> Foundation.NSDictionary
-  @objc(isRokidAppInstalled) final public func isRokidAppInstalled() -> Foundation.NSDictionary
+public typealias RokidGlassCallback = (_ result: Any?, _ keepAlive: Swift.Bool) -> Swift.Void
+@_inheritsConvenienceInitializers @objc(RokidGlassBridge) @objcMembers final public class RokidGlassBridge : ObjectiveC.NSObject {
+  @objc public static let shared: RokidCXRLUniPlugin.RokidGlassBridge
+  @objc override dynamic public init()
+  @objc(sharedInstance) public static func sharedInstance() -> RokidCXRLUniPlugin.RokidGlassBridge
+  @objc final public func setEventCallback(_ callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func initSDK(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func checkPermissions(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func requestAuthorization(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func connectCustomView(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func connectCustomApp(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func openCustomView(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func updateCustomView(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func closeCustomView(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func queryApp(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func openApp(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func stopApp(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func changeAudioSceneId(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func startAudioRecord(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func stopAudioRecord(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func startPhoneAudioRecord(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func stopPhoneAudioRecord(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func isBluetoothConnected(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func requestSystemInfo(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func requestGlassDeviceInfo(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func getState(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc final public func releaseSession(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc public static func handleOpenURL(_ url: Foundation.URL) -> Swift.Bool
+  @objc final public func handleOpenURL(_ options: Foundation.NSDictionary?, callback: RokidCXRLUniPlugin.RokidGlassCallback?)
+  @objc public static func bootstrapDefault()
+  @objc deinit
+}
+@objc(UniPluginProtocol) public protocol UniPluginProtocol : ObjectiveC.NSObjectProtocol {
+}
+@_inheritsConvenienceInitializers @objc(RokidGlassPluginProxy) @objcMembers public class RokidGlassPluginProxy : ObjectiveC.NSObject, RokidCXRLUniPlugin.UniPluginProtocol {
+  @objc public func onCreateUniPlugin()
+  @objc public func application(_ application: UIKit.UIApplication, didFinishLaunchingWithOptions launchOptions: [UIKit.UIApplication.LaunchOptionsKey : Any]? = nil) -> Swift.Bool
+  @objc public func application(_ app: UIKit.UIApplication, open url: Foundation.URL, options: [UIKit.UIApplication.OpenURLOptionsKey : Any] = [:]) -> Swift.Bool
+  @objc public func application(_ application: UIKit.UIApplication, open url: Foundation.URL, sourceApplication: Swift.String?, annotation: Any) -> Swift.Bool
+  @objc public func application(_ application: UIKit.UIApplication, handleOpen url: Foundation.URL) -> Swift.Bool
+  @objc public func application(_ application: UIKit.UIApplication, continue userActivity: Foundation.NSUserActivity, restorationHandler: @escaping ([Any]?) -> Swift.Void) -> Swift.Bool
+  @objc @available(iOS 13.0, *)
+  public func scene(_ scene: UIKit.UIScene, openURLContexts URLContexts: Swift.Set<UIKit.UIOpenURLContext>)
+  @objc @available(iOS 13.0, *)
+  public func scene(_ scene: UIKit.UIScene, continue userActivity: Foundation.NSUserActivity)
+  @objc override dynamic public init()
+  @objc deinit
+}
+@_inheritsConvenienceInitializers @objc(RokidCXRLPluginProxy) @objcMembers final public class RokidCXRLPluginProxy : RokidCXRLUniPlugin.RokidGlassPluginProxy {
   @objc override dynamic public init()
   @objc deinit
 }
