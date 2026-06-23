@@ -1457,7 +1457,7 @@ public final class RokidGlassBridge: NSObject {
             "hasToken": client.auth.isAuthenticated() || !token.isEmpty,
             "ready": client.auth.isAuthenticated() || !token.isEmpty,
             "cxrConnected": client.auth.isAuthenticated() || !token.isEmpty,
-            "glassBtConnected": client.auth.isAuthenticated() || !token.isEmpty,
+            "glassBtConnected": RGCxrClientBLE.shared.isConnected,
             "sceneReady": sceneReady,
             "audioStarted": audioStarted,
             "phoneAudioStarted": phoneAudioStarted,
