@@ -118,12 +118,34 @@ public final class RokidGlassBridge: NSObject {
             return
         }
 
-        if client.auth.isAuthenticated() {
+        let requireSessionId = boolOption(options, "requireSessionId", false)
+        let forceReauthorize = boolOption(options, "forceReauthorize", boolOption(options, "forceAuthorization", false))
+        if forceReauthorize {
+            client.auth.clearAuthentication()
+            token = ""
+            sessionId = ""
+            deviceName = currentDeviceName()
+            emit("authorizationState", stateJson().merging([
+                "message": "forceReauthorize"
+            ]) { _, new in new })
+        }
+
+        let cachedSessionId = client.auth.currentSessionId ?? sessionId
+        if client.auth.isAuthenticated() && (!requireSessionId || !cachedSessionId.isEmpty) {
             token = client.auth.currentToken ?? token
-            sessionId = client.auth.currentSessionId ?? sessionId
+            sessionId = cachedSessionId
             deviceName = client.auth.currentDeviceName ?? currentDeviceName()
             invoke(callback, ok(authorizationPayload()))
             return
+        }
+        if client.auth.isAuthenticated() && requireSessionId && cachedSessionId.isEmpty {
+            client.auth.clearAuthentication()
+            token = ""
+            sessionId = ""
+            deviceName = currentDeviceName()
+            emit("authorizationState", stateJson().merging([
+                "message": "sessionIdMissingReauthorize"
+            ]) { _, new in new })
         }
 
         authorizationRequestId += 1
@@ -1287,6 +1309,7 @@ public final class RokidGlassBridge: NSObject {
             appendCustomViewVariant(&variants, name: "textOnly", json: textOnlyCustomViewJson(text: text))
         }
         appendCustomViewVariant(&variants, name: "requested", json: requestedViewJson)
+        appendCustomViewVariant(&variants, name: "officialSampleText", json: officialSampleTextCustomViewJson(title: title, text: text))
         appendCustomViewVariant(&variants, name: "nativeDefault", json: defaultCustomViewJson(title: title, text: text))
         appendCustomViewVariant(&variants, name: "compact", json: compactCustomViewJson(title: title, text: text))
         appendCustomViewVariant(&variants, name: "textOnly", json: textOnlyCustomViewJson(text: text))
@@ -1339,6 +1362,59 @@ public final class RokidGlassBridge: NSObject {
                         "textColor": "#FF00FF00",
                         "textSize": "16sp",
                         "gravity": "center"
+                    ]
+                ]
+            ]
+        ])
+    }
+
+    private func officialSampleTextCustomViewJson(title: String, text: String) -> String {
+        return jsonString([
+            "type": "LinearLayout",
+            "props": [
+                "layout_width": "match_parent",
+                "layout_height": "match_parent",
+                "orientation": "vertical",
+                "gravity": "center_vertical",
+                "paddingTop": "140dp",
+                "paddingBottom": "100dp",
+                "backgroundColor": "#FF000000"
+            ],
+            "children": [
+                [
+                    "type": "TextView",
+                    "props": [
+                        "id": "tv_title",
+                        "layout_width": "wrap_content",
+                        "layout_height": "wrap_content",
+                        "text": title,
+                        "textColor": "#FF00FF00",
+                        "textSize": "16sp",
+                        "textStyle": "bold",
+                        "marginBottom": "20dp"
+                    ]
+                ],
+                [
+                    "type": "RelativeLayout",
+                    "props": [
+                        "layout_width": "match_parent",
+                        "layout_height": "100dp",
+                        "paddingStart": "10dp",
+                        "backgroundColor": "#000000"
+                    ],
+                    "children": [
+                        [
+                            "type": "TextView",
+                            "props": [
+                                "id": "textView",
+                                "layout_width": "wrap_content",
+                                "layout_height": "wrap_content",
+                                "text": text,
+                                "textColor": "#FF00FF00",
+                                "textSize": "16sp",
+                                "layout_centerVertical": "true"
+                            ]
+                        ]
                     ]
                 ]
             ]
@@ -1449,14 +1525,16 @@ public final class RokidGlassBridge: NSObject {
 
     private func stateJson() -> [String: Any] {
         let currentSessionId = sessionId.isEmpty ? (client.auth.currentSessionId ?? "") : sessionId
+        let authenticated = client.auth.isAuthenticated() || !token.isEmpty
         let currentName = currentDeviceName()
         let glassId = currentGlassId()
         return [
             "sessionType": sessionType,
             "packageName": packageName,
-            "hasToken": client.auth.isAuthenticated() || !token.isEmpty,
-            "ready": client.auth.isAuthenticated() || !token.isEmpty,
-            "cxrConnected": client.auth.isAuthenticated() || !token.isEmpty,
+            "hasToken": authenticated,
+            "ready": authenticated,
+            "cxrConnected": authenticated,
+            "authSessionMissing": authenticated && currentSessionId.isEmpty,
             "glassBtConnected": RGCxrClientBLE.shared.isConnected,
             "sceneReady": sceneReady,
             "audioStarted": audioStarted,
