@@ -209,8 +209,15 @@ public final class RokidGlassBridge: NSObject {
             }
         }
         let delayMs = closeBeforeOpen ? max(250, intOption(options, "openDelayMs", 600)) : max(0, intOption(options, "openDelayMs", 0))
+        let attemptTimeoutMs = max(1500, min(6000, intOption(options, "openAttemptTimeoutMs", 2500)))
         DispatchQueue.main.asyncAfter(deadline: .now() + (Double(delayMs) / 1000.0)) { [weak self] in
-            self?.openCustomViewVariant(requestId: requestId, variants: variants, index: 0, callback: callback)
+            self?.openCustomViewVariant(
+                requestId: requestId,
+                variants: variants,
+                index: 0,
+                callback: callback,
+                attemptTimeoutMs: attemptTimeoutMs
+            )
         }
     }
 
@@ -1166,7 +1173,8 @@ public final class RokidGlassBridge: NSObject {
         requestId: Int64,
         variants: [(name: String, json: String)],
         index: Int,
-        callback: RokidGlassCallback?
+        callback: RokidGlassCallback?,
+        attemptTimeoutMs: Int
     ) {
         guard requestId == customViewOpenRequestId else { return }
         guard index < variants.count else {
@@ -1196,10 +1204,12 @@ public final class RokidGlassBridge: NSObject {
             "variantCount": variants.count
         ]))
 
-        client.openCustomView(variant.json) { [weak self] success, errorCode in
+        var completed = false
+        let finish: (_ success: Bool, _ errorCode: Int?, _ timedOut: Bool) -> Void = { [weak self] success, errorCode, timedOut in
             guard let self = self else { return }
             DispatchQueue.main.async {
-                guard requestId == self.customViewOpenRequestId else { return }
+                guard requestId == self.customViewOpenRequestId, !completed else { return }
+                completed = true
                 self.sceneReady = success
                 if success {
                     self.lastCustomViewStage = "opened"
@@ -1215,14 +1225,17 @@ public final class RokidGlassBridge: NSObject {
                     return
                 }
 
-                self.lastCustomViewStage = "failed"
-                self.lastCustomViewErrorCode = errorCode ?? 1003
-                self.lastCustomViewMessage = "openCustomView failed: \(variant.name), errorCode=\(String(describing: errorCode))"
-                self.emit("customViewOpenFailed", self.customViewPayload(extra: [
+                self.lastCustomViewStage = timedOut ? "timeout" : "failed"
+                self.lastCustomViewErrorCode = timedOut ? 1004 : (errorCode ?? 1003)
+                self.lastCustomViewMessage = timedOut
+                    ? "openCustomView timeout: \(variant.name), timeoutMs=\(attemptTimeoutMs)"
+                    : "openCustomView failed: \(variant.name), errorCode=\(String(describing: errorCode))"
+                self.emit(timedOut ? "customViewOpenTimeout" : "customViewOpenFailed", self.customViewPayload(extra: [
                     "success": false,
-                    "errorCode": errorCode ?? -1,
+                    "errorCode": timedOut ? 1004 : (errorCode ?? -1),
                     "variantIndex": index,
-                    "variantCount": variants.count
+                    "variantCount": variants.count,
+                    "timeoutMs": timedOut ? attemptTimeoutMs : 0
                 ]))
 
                 if index + 1 < variants.count {
@@ -1232,23 +1245,33 @@ public final class RokidGlassBridge: NSObject {
                             requestId: requestId,
                             variants: variants,
                             index: index + 1,
-                            callback: callback
+                            callback: callback,
+                            attemptTimeoutMs: attemptTimeoutMs
                         )
                     }
                     return
                 }
 
-                let message = "openCustomView failed after \(variants.count) variants, lastErrorCode=\(String(describing: errorCode))"
+                let message = timedOut
+                    ? "openCustomView timeout after \(variants.count) variants, timeoutMs=\(attemptTimeoutMs)"
+                    : "openCustomView failed after \(variants.count) variants, lastErrorCode=\(String(describing: errorCode))"
                 self.lastCustomViewMessage = message
                 let payload = self.customViewPayload(extra: [
                     "success": false,
-                    "errorCode": errorCode ?? -1,
+                    "errorCode": timedOut ? 1004 : (errorCode ?? -1),
                     "variantIndex": index,
-                    "variantCount": variants.count
+                    "variantCount": variants.count,
+                    "timeoutMs": timedOut ? attemptTimeoutMs : 0
                 ])
                 self.emit("customViewError", payload)
                 self.invoke(callback, self.error(1003, message))
             }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(attemptTimeoutMs)) {
+            finish(false, 1004, true)
+        }
+        client.openCustomView(variant.json) { success, errorCode in
+            finish(success, errorCode, false)
         }
     }
 
